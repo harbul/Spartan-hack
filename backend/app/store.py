@@ -24,7 +24,7 @@ import boto3
 from boto3.dynamodb.conditions import Key
 from pydantic import BaseModel
 
-from app.schemas import Case, Event, Message, Outage, Plan, Resident, Resource, Trace, Volunteer
+from app.schemas import Case, Event, Message, Outage, Plan, Resident, Resource, Run, Trace, Volunteer
 
 _HERE = Path(__file__).resolve().parent
 SEED_DIRS = [_HERE.parent / "data", _HERE.parents[1] / "data"]
@@ -230,6 +230,22 @@ def put_plan(plan: Plan) -> None:
 def get_plan(plan_id: str) -> Plan | None:
     item = _table("PLANS_TABLE").get_item(Key={"plan_id": plan_id}).get("Item")
     return Plan.model_validate(_plain(item)) if item else None
+
+
+def latest_plan(outage_id: str) -> Plan | None:
+    """Newest plan for the outage (plan ids start with their creation time)."""
+    plans = [i for i in _scan_all(_table("PLANS_TABLE")) if i.get("outage_id") == outage_id]
+    newest = max(plans, key=lambda i: i["plan_id"], default=None)
+    return Plan.model_validate(_plain(newest)) if newest else None
+
+
+def find_run(run_id: str) -> tuple[Plan, Run] | None:
+    for item in _scan_all(_table("PLANS_TABLE")):
+        plan = Plan.model_validate(_plain(item))
+        for run in plan.runs:
+            if run.run_id == run_id:
+                return plan, run
+    return None
 
 
 def put_trace(trace: Trace) -> None:

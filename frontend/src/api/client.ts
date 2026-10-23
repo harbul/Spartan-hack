@@ -9,7 +9,7 @@
  */
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { mockDashboard, mockMessages } from './mock';
+import { type MockPlanState, mockDashboard, mockMessages, mockRun } from './mock';
 import { zonePolygon } from './seed';
 import type {
   CaseResponse,
@@ -20,6 +20,8 @@ import type {
   InboundRequest,
   Message,
   MessagesResponse,
+  PlanResponse,
+  RunResponse,
   Trace,
   TracesResponse,
 } from './types';
@@ -54,6 +56,8 @@ export interface DashboardState {
   reset: () => void;
   loadZone: () => void;
   sendCheckins: () => void;
+  planDispatch: () => void;
+  approvePlan: () => void;
 }
 
 const minutesSinceStart = (d: DashboardResponse | undefined) =>
@@ -119,20 +123,32 @@ function useLiveDashboard(): DashboardState {
       void run(`Amazon Bedrock is writing ${toContact} check-ins…`, () =>
         apiPost<CheckinsResponse>(`/outages/${outageId}/checkins`),
       ),
+    planDispatch: () =>
+      void run('Amazon Bedrock is planning volunteer routes with Amazon Location…', () =>
+        apiPost<PlanResponse>('/plans', { outage_id: outageId }),
+      ),
+    approvePlan: () =>
+      void run('Approving the plan…', () => apiPost<PlanResponse>(`/plans/${data?.plan?.plan_id}/approve`)),
   };
 }
 
 function useMockDashboard(): DashboardState {
   const [minute, setMinute] = useState(0);
-  const data = useMemo(() => mockDashboard(minute), [minute]);
+  const [plan, setPlan] = useState<MockPlanState | null>(null);
+  const data = useMemo(() => mockDashboard(minute, plan), [minute, plan]);
   return {
     data,
     error: null,
     busy: null,
     advance: useCallback((minutes: number) => setMinute((m) => Math.min(m + minutes, OUTAGE_HOURS * 60)), []),
-    reset: () => setMinute(0),
+    reset: () => {
+      setMinute(0);
+      setPlan(null);
+    },
     loadZone: () => {}, // the mock always has its outage
     sendCheckins: () => setMinute((m) => Math.max(m, 5)), // the mock sends them at +5 min
+    planDispatch: () => setPlan({ status: 'draft', drafted_at: minute, done: [] }),
+    approvePlan: () => setPlan((p) => p && { ...p, status: 'approved' }),
   };
 }
 
@@ -161,6 +177,24 @@ export function useTraces(): Trace[] {
   });
   return query.data?.traces ?? [];
 }
+
+/** A volunteer's route sheet (GET /runs/{id}), polled. The mock serves an approved plan at +4 h. */
+export function useRun(runId: string): { data: RunResponse | null | undefined; error: Error | null } {
+  const query = useQuery({
+    queryKey: ['run', runId],
+    queryFn: () => apiGet<RunResponse>(`/runs/${runId}`),
+    refetchInterval: POLL_MS,
+    enabled: !USE_MOCK,
+  });
+  const mock = useMemo(
+    () => (USE_MOCK ? mockRun(runId, mockDashboard(240, { status: 'approved', drafted_at: 240, done: [] })) : null),
+    [runId],
+  );
+  return USE_MOCK ? { data: mock, error: null } : { data: query.data, error: query.error };
+}
+
+export const markStopDone = (runId: string, residentId: string) =>
+  apiPost<CaseResponse>(`/runs/${runId}/stops/${residentId}/done`);
 
 /** The phone simulator's send: the same /inbound webhook real SMS would call. */
 export const sendInbound = (body: InboundRequest) => apiPost<CaseResponse>('/inbound', body);
