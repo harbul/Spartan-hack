@@ -5,14 +5,28 @@
  *   replies  the 20 labeled test replies, then most others reply "1"
  *   silence  Lupe and three others never reply and climb the §5 ladder
  *            (L1 30 min, L2 60, L3 90; halved for oxygen and dialysis)
- * Priorities and "why" texts are placeholders, not the §5 score or Bedrock.
+ *   plan     "Plan dispatch" drafts a plan from the open cases (round-robin, straight
+ *            lines); "Approve" dispatches them; "Mark done" resolves a stop
+ * Priorities, "why" texts and plans are placeholders, not the §5 score or Bedrock.
  * Delete when /dashboard is wired (H4-H6).
  *
  * Owner: P1 (Frontend and UX).
  */
 import { residents, resources, testReplies, volunteers, zonePolygon, type TestReply } from './seed';
 import { givenName } from '../components/status';
-import type { Assessment, Band, Case, DashboardCase, DashboardResponse, Event, Message, Resident } from './types';
+import type {
+  Assessment,
+  Band,
+  Case,
+  DashboardCase,
+  DashboardResponse,
+  Event,
+  Message,
+  Plan,
+  Resident,
+  RunResponse,
+  Stop,
+} from './types';
 
 const START = '2026-10-24T01:00:00Z'; // 6 PM PDT, Friday Oct 23
 const OUTAGE_HOURS = 14;
@@ -130,12 +144,75 @@ function eventsUntil(minute: number): Event[] {
   return events.filter((e) => e.ts <= at(minute)).sort((a, b) => a.ts.localeCompare(b.ts));
 }
 
-export function mockDashboard(minute: number): DashboardResponse {
+export interface MockPlanState {
+  status: 'draft' | 'approved';
+  drafted_at: number; // minute
+  done: string[]; // resident ids marked done
+}
+
+const ACTION_ITEMS: Record<Stop['action'], string[]> = {
+  cooler: ['cooler', 'ice packs'],
+  battery: ['charged battery pack'],
+  door_knock: ['phone', 'printed resource center info'],
+  ride: ['seat for one'],
+};
+
+function mockPlan(cases: DashboardCase[], state: MockPlanState): Plan {
+  const open = cases
+    .filter((c) => ['needs_help', 'escalated', 'silent'].includes(c.status) && c.priority >= 60)
+    .sort((a, b) => b.priority - a.priority);
+  const runs = volunteers.map((v, i) => ({ volunteer: v, stops: open.filter((_, j) => j % volunteers.length === i).slice(0, 6) }));
+  return {
+    plan_id: 'plan-mock',
+    outage_id: OUTAGE_ID,
+    status: state.status,
+    summary: 'Mock plan: highest priority first, shared round-robin between the three volunteers.',
+    trace_id: null,
+    uncovered: open.slice(volunteers.length * 6).map((c) => c.resident_id),
+    runs: runs
+      .filter((r) => r.stops.length)
+      .map(({ volunteer, stops }) => ({
+        run_id: `run-mock-${volunteer.volunteer_id}`,
+        volunteer: volunteer.volunteer_id,
+        vehicle: volunteer.vehicle,
+        duration_min: 8 * stops.length,
+        geometry: {
+          type: 'LineString',
+          coordinates: [[volunteer.start.lng, volunteer.start.lat], ...stops.map((c) => [c.resident.lng, c.resident.lat])],
+        },
+        stops: stops.map((c) => {
+          const action: Stop['action'] = ['escalated', 'silent'].includes(c.status)
+            ? 'door_knock'
+            : c.assessment?.needs_transport
+              ? 'ride'
+              : c.assessment?.needs.includes('cooling_for_medication')
+                ? 'cooler'
+                : 'battery';
+          return { resident_id: c.resident_id, action, items: ACTION_ITEMS[action], reason: c.rationale ?? 'Mock reason', eta: null };
+        }),
+      })),
+  };
+}
+
+export function mockDashboard(minute: number, planState: MockPlanState | null = null): DashboardResponse {
+  const draftCases = planState ? residents.map((resident, i) => caseAt(resident, i, planState.drafted_at)) : [];
   const cases: DashboardCase[] = residents.map((resident, i) => {
     const c = caseAt(resident, i, minute);
     const hours = (c.assessment?.supply_hours_left ?? resident.baseline_backup_hours) - minute / 60;
     return { ...c, resident, backup_hours_left: Math.max(0, Math.round(hours * 10) / 10) };
   });
+  let plan: Plan | null = null;
+  if (planState) {
+    plan = mockPlan(
+      draftCases.map((c, i) => ({ ...c, resident: residents[i], backup_hours_left: null })),
+      planState,
+    );
+    const planned = new Set(plan.runs.flatMap((r) => r.stops.map((s) => s.resident_id)));
+    for (const c of cases) {
+      if (planState.done.includes(c.resident_id)) c.status = 'resolved';
+      else if (planState.status === 'approved' && planned.has(c.resident_id)) c.status = 'dispatched';
+    }
+  }
   const count = (fn: (c: Case) => boolean) => cases.filter(fn).length;
   return {
     now: at(minute),
@@ -156,7 +233,7 @@ export function mockDashboard(minute: number): DashboardResponse {
     },
     cases,
     events: eventsUntil(minute),
-    plan: null,
+    plan,
     resources,
     volunteers,
   };
@@ -193,4 +270,18 @@ export function mockMessages(residentId: string, minute: number): Message[] {
     });
   }
   return messages;
+}
+
+export function mockRun(runId: string, dashboard: DashboardResponse): RunResponse | null {
+  const run = dashboard.plan?.runs.find((r) => r.run_id === runId);
+  if (!run) return null;
+  const cases = new Map(dashboard.cases.map((c) => [c.resident_id, c]));
+  return {
+    run,
+    volunteer: volunteers.find((v) => v.volunteer_id === run.volunteer) ?? null,
+    stops_detail: run.stops.map((s) => {
+      const c = cases.get(s.resident_id)!;
+      return { resident_id: s.resident_id, name: c.resident.name, address: c.resident.address, lat: c.resident.lat, lng: c.resident.lng, status: c.status };
+    }),
+  };
 }
