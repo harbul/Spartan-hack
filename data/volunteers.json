@@ -1,6 +1,6 @@
 {
   "_meta": {
-    "about": "Fictional demo volunteers (3), each with a vehicle type and start location. One example record so far. Phones use 555 numbers.",
+    "about": "Fictional demo volunteers (3), each with a vehicle type and start location. Phones use 555 numbers. capacity = passenger seats for ride stops (PROPOSED).",
     "plan": "§3 demo scenario, §4 Job 5 list_volunteers, §7 config.volunteers",
     "owner": "P4 (Story, data and video)",
     "shape": "backend/app/schemas.py Volunteer / frontend/src/api/types.ts Volunteer"
@@ -11,8 +11,33 @@
       "name": "Sam Rivera",
       "phone": "+14085550181",
       "vehicle": "suv",
-      "start": { "lat": 37.3521, "lng": -121.8402 },
+      "start": {
+        "lat": 37.3521,
+        "lng": -121.8402
+      },
       "capacity": 3
+    },
+    {
+      "volunteer_id": "vol-2",
+      "name": "Priya Natarajan",
+      "phone": "+14085550182",
+      "vehicle": "sedan",
+      "start": {
+        "lat": 37.399,
+        "lng": -121.827
+      },
+      "capacity": 2
+    },
+    {
+      "volunteer_id": "vol-3",
+      "name": "Luis Mendoza",
+      "phone": "+14085550183",
+      "vehicle": "accessible_van",
+      "start": {
+        "lat": 37.3382,
+        "lng": -121.8224
+      },
+      "capacity": 1
     }
   ]
 }

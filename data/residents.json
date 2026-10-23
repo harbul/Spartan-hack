@@ -1,6 +1,6 @@
 {
   "_meta": {
-    "about": "Synthetic registry of electricity-dependent residents (~40, incl. the 5 hero residents from PLAN.md §3). The 5 hero residents so far (res-001 to res-005); the other ~35 come in H1-H4. All data is fictional; phones use 555-01xx numbers.",
+    "about": "Synthetic registry of 40 electricity-dependent residents inside the outage zone, incl. the 5 hero residents from PLAN.md §3 (res-001 to res-005). All data is fictional; phones use 555-01xx numbers.",
     "plan": "§3 demo scenario, §7 residents table",
     "owner": "P4 (Story, data and video)",
     "shape": "backend/app/schemas.py Resident / frontend/src/api/types.ts Resident"
@@ -63,10 +63,10 @@
         "power_wheelchair"
       ],
       "baseline_backup_hours": 8,
-      "lives_alone": false,
+      "lives_alone": true,
       "emergency_contact": {
         "name": "Grace Kim",
-        "relation": "wife",
+        "relation": "daughter",
         "phone": "+14085550153",
         "language": "en"
       },
@@ -115,6 +115,780 @@
         "language": "es"
       },
       "notes": "Demo data. Home oxygen concentrator; lives alone."
+    },
+    {
+      "resident_id": "res-006",
+      "name": "Nguyễn Thị Hoa",
+      "age": 71,
+      "phone": "+14085550106",
+      "address": "4659 Fictional Buckeye Rd, San Jose, CA 95127",
+      "lat": 37.3757,
+      "lng": -121.7755,
+      "language": "vi",
+      "devices": [
+        "oxygen"
+      ],
+      "baseline_backup_hours": 6,
+      "lives_alone": false,
+      "emergency_contact": {
+        "name": "Nguyễn Quân",
+        "relation": "sister",
+        "phone": "+14085550141",
+        "language": "vi"
+      },
+      "notes": "Demo data. Home oxygen concentrator."
+    },
+    {
+      "resident_id": "res-007",
+      "name": "Phạm Văn Đức",
+      "age": 80,
+      "phone": "+14085550107",
+      "address": "761 Fictional Vista Ln, San Jose, CA 95127",
+      "lat": 37.3901,
+      "lng": -121.796,
+      "language": "vi",
+      "devices": [
+        "dialysis"
+      ],
+      "baseline_backup_hours": 9,
+      "lives_alone": false,
+      "emergency_contact": {
+        "name": "Phạm Nam",
+        "relation": "sister",
+        "phone": "+14085550142",
+        "language": "vi"
+      },
+      "notes": "Demo data. Home dialysis."
+    },
+    {
+      "resident_id": "res-008",
+      "name": "Lê Thị Mai",
+      "age": 67,
+      "phone": "+14085550108",
+      "address": "3183 Fictional Quail Run Pl, San Jose, CA 95127",
+      "lat": 37.3858,
+      "lng": -121.8242,
+      "language": "vi",
+      "devices": [
+        "insulin"
+      ],
+      "baseline_backup_hours": 12,
+      "lives_alone": false,
+      "emergency_contact": {
+        "name": "Lê Hùng",
+        "relation": "son",
+        "phone": "+14085550143",
+        "language": "vi"
+      },
+      "notes": "Demo data. Keeps insulin in the fridge."
+    },
+    {
+      "resident_id": "res-009",
+      "name": "Võ Minh Tuấn",
+      "age": 59,
+      "phone": "+14085550109",
+      "address": "4830 Fictional Manzanita Dr, San Jose, CA 95127",
+      "lat": 37.3784,
+      "lng": -121.8181,
+      "language": "vi",
+      "devices": [
+        "power_wheelchair"
+      ],
+      "baseline_backup_hours": 11,
+      "lives_alone": true,
+      "emergency_contact": {
+        "name": "Võ Phương",
+        "relation": "grandson",
+        "phone": "+14085550144",
+        "language": "vi"
+      },
+      "notes": "Demo data. Uses a power wheelchair."
+    },
+    {
+      "resident_id": "res-010",
+      "name": "Đặng Thị Thu",
+      "age": 84,
+      "phone": "+14085550110",
+      "address": "4122 Fictional Live Oak Rd, San Jose, CA 95127",
+      "lat": 37.3783,
+      "lng": -121.775,
+      "language": "vi",
+      "devices": [
+        "oxygen",
+        "power_wheelchair"
+      ],
+      "baseline_backup_hours": 7,
+      "lives_alone": false,
+      "emergency_contact": {
+        "name": "Đặng Nam",
+        "relation": "sister",
+        "phone": "+14085550145",
+        "language": "vi"
+      },
+      "notes": "Demo data. Home oxygen concentrator. Uses a power wheelchair."
+    },
+    {
+      "resident_id": "res-011",
+      "name": "Huỳnh Văn Long",
+      "age": 73,
+      "phone": "+14085550111",
+      "address": "500 Fictional Quail Run Pl, San Jose, CA 95127",
+      "lat": 37.3758,
+      "lng": -121.7796,
+      "language": "vi",
+      "devices": [
+        "insulin"
+      ],
+      "baseline_backup_hours": 14,
+      "lives_alone": false,
+      "emergency_contact": {
+        "name": "Huỳnh Linh",
+        "relation": "grandson",
+        "phone": "+14085550146",
+        "language": "vi"
+      },
+      "notes": "Demo data. Keeps insulin in the fridge."
+    },
+    {
+      "resident_id": "res-012",
+      "name": "Bùi Thị Ngọc",
+      "age": 69,
+      "phone": "+14085550112",
+      "address": "3842 Fictional Alder Pl, San Jose, CA 95127",
+      "lat": 37.3732,
+      "lng": -121.8038,
+      "language": "vi",
+      "devices": [
+        "other"
+      ],
+      "baseline_backup_hours": 12,
+      "lives_alone": true,
+      "emergency_contact": {
+        "name": "Bùi Bảo",
+        "relation": "grandson",
+        "phone": "+14085550147",
+        "language": "vi"
+      },
+      "notes": "Demo data. Uses a powered medical bed and CPAP."
+    },
+    {
+      "resident_id": "res-013",
+      "name": "Trương Văn Phúc",
+      "age": 76,
+      "phone": "+14085550113",
+      "address": "4023 Fictional Live Oak Way, San Jose, CA 95127",
+      "lat": 37.3852,
+      "lng": -121.8169,
+      "language": "vi",
+      "devices": [
+        "oxygen"
+      ],
+      "baseline_backup_hours": 3,
+      "lives_alone": true,
+      "emergency_contact": {
+        "name": "Megan Trương",
+        "relation": "neighbor",
+        "phone": "+14085550148",
+        "language": "en"
+      },
+      "notes": "Demo data. Home oxygen concentrator."
+    },
+    {
+      "resident_id": "res-014",
+      "name": "Đỗ Thị Hạnh",
+      "age": 62,
+      "phone": "+14085550114",
+      "address": "4383 Fictional Alder Ln, San Jose, CA 95148",
+      "lat": 37.3456,
+      "lng": -121.8288,
+      "language": "vi",
+      "devices": [
+        "dialysis"
+      ],
+      "baseline_backup_hours": 12,
+      "lives_alone": true,
+      "emergency_contact": {
+        "name": "Brian Đỗ",
+        "relation": "sister",
+        "phone": "+14085550149",
+        "language": "en"
+      },
+      "notes": "Demo data. Home dialysis."
+    },
+    {
+      "resident_id": "res-015",
+      "name": "Ngô Văn Hải",
+      "age": 88,
+      "phone": "+14085550115",
+      "address": "4669 Fictional Hillview Ln, San Jose, CA 95127",
+      "lat": 37.373,
+      "lng": -121.7825,
+      "language": "vi",
+      "devices": [
+        "oxygen"
+      ],
+      "baseline_backup_hours": 4,
+      "lives_alone": false,
+      "emergency_contact": {
+        "name": "Ngô Vy",
+        "relation": "son",
+        "phone": "+14085550150",
+        "language": "vi"
+      },
+      "notes": "Demo data. Home oxygen concentrator."
+    },
+    {
+      "resident_id": "res-016",
+      "name": "Lý Thị Kim",
+      "age": 79,
+      "phone": "+14085550116",
+      "address": "3810 Fictional Oak Knoll Way, San Jose, CA 95127",
+      "lat": 37.3713,
+      "lng": -121.7863,
+      "language": "vi",
+      "devices": [
+        "insulin",
+        "other"
+      ],
+      "baseline_backup_hours": 11,
+      "lives_alone": false,
+      "emergency_contact": {
+        "name": "Jessica Lý",
+        "relation": "neighbor",
+        "phone": "+14085550156",
+        "language": "en"
+      },
+      "notes": "Demo data. Keeps insulin in the fridge. Uses a powered medical bed and CPAP."
+    },
+    {
+      "resident_id": "res-017",
+      "name": "María Elena Torres",
+      "age": 72,
+      "phone": "+14085550117",
+      "address": "1298 Fictional Chaparral Dr, San Jose, CA 95127",
+      "lat": 37.3992,
+      "lng": -121.8122,
+      "language": "es",
+      "devices": [
+        "insulin"
+      ],
+      "baseline_backup_hours": 13,
+      "lives_alone": true,
+      "emergency_contact": {
+        "name": "Elena Torres",
+        "relation": "brother",
+        "phone": "+14085550157",
+        "language": "es"
+      },
+      "notes": "Demo data. Keeps insulin in the fridge."
+    },
+    {
+      "resident_id": "res-018",
+      "name": "José Luis Hernández",
+      "age": 68,
+      "phone": "+14085550118",
+      "address": "4576 Fictional Foothill Pl, San Jose, CA 95127",
+      "lat": 37.3926,
+      "lng": -121.8214,
+      "language": "es",
+      "devices": [
+        "dialysis"
+      ],
+      "baseline_backup_hours": 17,
+      "lives_alone": true,
+      "emergency_contact": {
+        "name": "Nina Hernández",
+        "relation": "granddaughter",
+        "phone": "+14085550158",
+        "language": "en"
+      },
+      "notes": "Demo data. Home dialysis."
+    },
+    {
+      "resident_id": "res-019",
+      "name": "Guadalupe Soto",
+      "age": 81,
+      "phone": "+14085550119",
+      "address": "1204 Fictional Mesa Ct, San Jose, CA 95127",
+      "lat": 37.3849,
+      "lng": -121.7969,
+      "language": "es",
+      "devices": [
+        "oxygen"
+      ],
+      "baseline_backup_hours": 5,
+      "lives_alone": false,
+      "emergency_contact": {
+        "name": "Brian Soto",
+        "relation": "brother",
+        "phone": "+14085550159",
+        "language": "en"
+      },
+      "notes": "Demo data. Home oxygen concentrator."
+    },
+    {
+      "resident_id": "res-020",
+      "name": "Ramón Castillo",
+      "age": 77,
+      "phone": "+14085550120",
+      "address": "4900 Fictional Manzanita Rd, San Jose, CA 95148",
+      "lat": 37.3624,
+      "lng": -121.8087,
+      "language": "es",
+      "devices": [
+        "power_wheelchair"
+      ],
+      "baseline_backup_hours": 12,
+      "lives_alone": true,
+      "emergency_contact": {
+        "name": "Lucía Castillo",
+        "relation": "niece",
+        "phone": "+14085550160",
+        "language": "es"
+      },
+      "notes": "Demo data. Uses a power wheelchair."
+    },
+    {
+      "resident_id": "res-021",
+      "name": "Esperanza Morales",
+      "age": 66,
+      "phone": "+14085550121",
+      "address": "3289 Fictional Canyon Dr, San Jose, CA 95127",
+      "lat": 37.3762,
+      "lng": -121.8252,
+      "language": "es",
+      "devices": [
+        "insulin"
+      ],
+      "baseline_backup_hours": 30,
+      "lives_alone": false,
+      "emergency_contact": {
+        "name": "Carlos Morales",
+        "relation": "daughter",
+        "phone": "+14085550161",
+        "language": "es"
+      },
+      "notes": "Demo data. Keeps insulin in the fridge."
+    },
+    {
+      "resident_id": "res-022",
+      "name": "Alfredo Gutiérrez",
+      "age": 58,
+      "phone": "+14085550122",
+      "address": "2770 Fictional Vista Way, San Jose, CA 95148",
+      "lat": 37.3465,
+      "lng": -121.8043,
+      "language": "es",
+      "devices": [
+        "other"
+      ],
+      "baseline_backup_hours": 11,
+      "lives_alone": false,
+      "emergency_contact": {
+        "name": "Brian Gutiérrez",
+        "relation": "niece",
+        "phone": "+14085550162",
+        "language": "en"
+      },
+      "notes": "Demo data. Uses a powered medical bed and CPAP."
+    },
+    {
+      "resident_id": "res-023",
+      "name": "Carmen Vega",
+      "age": 85,
+      "phone": "+14085550123",
+      "address": "669 Fictional Mesa Way, San Jose, CA 95127",
+      "lat": 37.371,
+      "lng": -121.8148,
+      "language": "es",
+      "devices": [
+        "oxygen"
+      ],
+      "baseline_backup_hours": 2,
+      "lives_alone": true,
+      "emergency_contact": {
+        "name": "Marisol Vega",
+        "relation": "niece",
+        "phone": "+14085550163",
+        "language": "es"
+      },
+      "notes": "Demo data. Home oxygen concentrator."
+    },
+    {
+      "resident_id": "res-024",
+      "name": "Rafael Ortiz",
+      "age": 63,
+      "phone": "+14085550124",
+      "address": "1644 Fictional Alder Pl, San Jose, CA 95148",
+      "lat": 37.3477,
+      "lng": -121.7991,
+      "language": "es",
+      "devices": [
+        "dialysis"
+      ],
+      "baseline_backup_hours": 6,
+      "lives_alone": true,
+      "emergency_contact": {
+        "name": "Brian Ortiz",
+        "relation": "brother",
+        "phone": "+14085550164",
+        "language": "en"
+      },
+      "notes": "Demo data. Home dialysis."
+    },
+    {
+      "resident_id": "res-025",
+      "name": "Dolores Jiménez",
+      "age": 90,
+      "phone": "+14085550125",
+      "address": "1413 Fictional Oak Knoll Way, San Jose, CA 95148",
+      "lat": 37.3581,
+      "lng": -121.7738,
+      "language": "es",
+      "devices": [
+        "oxygen",
+        "insulin"
+      ],
+      "baseline_backup_hours": 9,
+      "lives_alone": false,
+      "emergency_contact": {
+        "name": "Sarah Jiménez",
+        "relation": "grandson",
+        "phone": "+14085550165",
+        "language": "en"
+      },
+      "notes": "Demo data. Home oxygen concentrator. Keeps insulin in the fridge."
+    },
+    {
+      "resident_id": "res-026",
+      "name": "Miguel Ángel Ríos",
+      "age": 70,
+      "phone": "+14085550126",
+      "address": "2456 Fictional Chaparral Ct, San Jose, CA 95148",
+      "lat": 37.3562,
+      "lng": -121.8269,
+      "language": "es",
+      "devices": [
+        "power_wheelchair"
+      ],
+      "baseline_backup_hours": 11,
+      "lives_alone": false,
+      "emergency_contact": {
+        "name": "Elena Ríos",
+        "relation": "sister",
+        "phone": "+14085550166",
+        "language": "es"
+      },
+      "notes": "Demo data. Uses a power wheelchair."
+    },
+    {
+      "resident_id": "res-027",
+      "name": "Teresa Navarro",
+      "age": 74,
+      "phone": "+14085550127",
+      "address": "1855 Fictional Crestline Dr, San Jose, CA 95148",
+      "lat": 37.3522,
+      "lng": -121.7803,
+      "language": "es",
+      "devices": [
+        "insulin"
+      ],
+      "baseline_backup_hours": 13,
+      "lives_alone": false,
+      "emergency_contact": {
+        "name": "Michael Navarro",
+        "relation": "granddaughter",
+        "phone": "+14085550167",
+        "language": "en"
+      },
+      "notes": "Demo data. Keeps insulin in the fridge."
+    },
+    {
+      "resident_id": "res-028",
+      "name": "Walter Brooks",
+      "age": 79,
+      "phone": "+14085550128",
+      "address": "1594 Fictional Ridge Ln, San Jose, CA 95127",
+      "lat": 37.3695,
+      "lng": -121.7813,
+      "language": "en",
+      "devices": [
+        "oxygen"
+      ],
+      "baseline_backup_hours": 8,
+      "lives_alone": true,
+      "emergency_contact": {
+        "name": "Amy Brooks",
+        "relation": "brother",
+        "phone": "+14085550168",
+        "language": "en"
+      },
+      "notes": "Demo data. Home oxygen concentrator."
+    },
+    {
+      "resident_id": "res-029",
+      "name": "Linda Chen",
+      "age": 67,
+      "phone": "+14085550129",
+      "address": "2397 Fictional Mesa Rd, San Jose, CA 95127",
+      "lat": 37.3862,
+      "lng": -121.7806,
+      "language": "en",
+      "devices": [
+        "insulin"
+      ],
+      "baseline_backup_hours": 21,
+      "lives_alone": false,
+      "emergency_contact": {
+        "name": "Chris Chen",
+        "relation": "neighbor",
+        "phone": "+14085550169",
+        "language": "en"
+      },
+      "notes": "Demo data. Keeps insulin in the fridge."
+    },
+    {
+      "resident_id": "res-030",
+      "name": "Patricia Johnson",
+      "age": 83,
+      "phone": "+14085550130",
+      "address": "3672 Fictional Oak Knoll Dr, San Jose, CA 95127",
+      "lat": 37.3852,
+      "lng": -121.8301,
+      "language": "en",
+      "devices": [
+        "power_wheelchair"
+      ],
+      "baseline_backup_hours": 16,
+      "lives_alone": true,
+      "emergency_contact": {
+        "name": "Michael Johnson",
+        "relation": "granddaughter",
+        "phone": "+14085550170",
+        "language": "en"
+      },
+      "notes": "Demo data. Uses a power wheelchair."
+    },
+    {
+      "resident_id": "res-031",
+      "name": "Robert Singh",
+      "age": 61,
+      "phone": "+14085550131",
+      "address": "2668 Fictional Foothill Rd, San Jose, CA 95127",
+      "lat": 37.3883,
+      "lng": -121.8261,
+      "language": "en",
+      "devices": [
+        "dialysis"
+      ],
+      "baseline_backup_hours": 8,
+      "lives_alone": true,
+      "emergency_contact": {
+        "name": "Megan Singh",
+        "relation": "granddaughter",
+        "phone": "+14085550171",
+        "language": "en"
+      },
+      "notes": "Demo data. Home dialysis."
+    },
+    {
+      "resident_id": "res-032",
+      "name": "Barbara Lee",
+      "age": 76,
+      "phone": "+14085550132",
+      "address": "2205 Fictional Buckeye Dr, San Jose, CA 95148",
+      "lat": 37.3547,
+      "lng": -121.8208,
+      "language": "en",
+      "devices": [
+        "oxygen"
+      ],
+      "baseline_backup_hours": 2,
+      "lives_alone": true,
+      "emergency_contact": {
+        "name": "Nina Lee",
+        "relation": "daughter",
+        "phone": "+14085550172",
+        "language": "en"
+      },
+      "notes": "Demo data. Home oxygen concentrator."
+    },
+    {
+      "resident_id": "res-033",
+      "name": "James O'Connor",
+      "age": 70,
+      "phone": "+14085550133",
+      "address": "2680 Fictional Chaparral Rd, San Jose, CA 95148",
+      "lat": 37.3636,
+      "lng": -121.833,
+      "language": "en",
+      "devices": [
+        "other"
+      ],
+      "baseline_backup_hours": 4,
+      "lives_alone": false,
+      "emergency_contact": {
+        "name": "Kevin O'Connor",
+        "relation": "granddaughter",
+        "phone": "+14085550173",
+        "language": "en"
+      },
+      "notes": "Demo data. Uses a powered medical bed and CPAP."
+    },
+    {
+      "resident_id": "res-034",
+      "name": "Susan Patel",
+      "age": 64,
+      "phone": "+14085550134",
+      "address": "1078 Fictional Sycamore Rd, San Jose, CA 95127",
+      "lat": 37.3815,
+      "lng": -121.7954,
+      "language": "en",
+      "devices": [
+        "insulin"
+      ],
+      "baseline_backup_hours": 24,
+      "lives_alone": true,
+      "emergency_contact": {
+        "name": "Amy Patel",
+        "relation": "granddaughter",
+        "phone": "+14085550174",
+        "language": "en"
+      },
+      "notes": "Demo data. Keeps insulin in the fridge."
+    },
+    {
+      "resident_id": "res-035",
+      "name": "Donald Wright",
+      "age": 87,
+      "phone": "+14085550135",
+      "address": "2807 Fictional Manzanita Pl, San Jose, CA 95148",
+      "lat": 37.3485,
+      "lng": -121.7864,
+      "language": "en",
+      "devices": [
+        "oxygen",
+        "power_wheelchair"
+      ],
+      "baseline_backup_hours": 6,
+      "lives_alone": true,
+      "emergency_contact": {
+        "name": "Jessica Wright",
+        "relation": "grandson",
+        "phone": "+14085550175",
+        "language": "en"
+      },
+      "notes": "Demo data. Home oxygen concentrator. Uses a power wheelchair."
+    },
+    {
+      "resident_id": "res-036",
+      "name": "Karen Yamamoto",
+      "age": 72,
+      "phone": "+14085550136",
+      "address": "1717 Fictional Mesa Dr, San Jose, CA 95148",
+      "lat": 37.3641,
+      "lng": -121.7723,
+      "language": "en",
+      "devices": [
+        "dialysis"
+      ],
+      "baseline_backup_hours": 9,
+      "lives_alone": true,
+      "emergency_contact": {
+        "name": "Kevin Yamamoto",
+        "relation": "son",
+        "phone": "+14085550176",
+        "language": "en"
+      },
+      "notes": "Demo data. Home dialysis."
+    },
+    {
+      "resident_id": "res-037",
+      "name": "Gary Thompson",
+      "age": 56,
+      "phone": "+14085550137",
+      "address": "2575 Fictional Ridge Way, San Jose, CA 95148",
+      "lat": 37.3521,
+      "lng": -121.8306,
+      "language": "en",
+      "devices": [
+        "power_wheelchair"
+      ],
+      "baseline_backup_hours": 15,
+      "lives_alone": true,
+      "emergency_contact": {
+        "name": "Amy Thompson",
+        "relation": "grandson",
+        "phone": "+14085550177",
+        "language": "en"
+      },
+      "notes": "Demo data. Uses a power wheelchair."
+    },
+    {
+      "resident_id": "res-038",
+      "name": "Helen Moore",
+      "age": 91,
+      "phone": "+14085550138",
+      "address": "1125 Fictional Oak Knoll Rd, San Jose, CA 95127",
+      "lat": 37.368,
+      "lng": -121.8221,
+      "language": "en",
+      "devices": [
+        "oxygen"
+      ],
+      "baseline_backup_hours": 2,
+      "lives_alone": false,
+      "emergency_contact": {
+        "name": "David Moore",
+        "relation": "brother",
+        "phone": "+14085550178",
+        "language": "en"
+      },
+      "notes": "Demo data. Home oxygen concentrator."
+    },
+    {
+      "resident_id": "res-039",
+      "name": "Anthony Davis",
+      "age": 68,
+      "phone": "+14085550139",
+      "address": "1969 Fictional Ridge Dr, San Jose, CA 95127",
+      "lat": 37.386,
+      "lng": -121.8102,
+      "language": "en",
+      "devices": [
+        "insulin"
+      ],
+      "baseline_backup_hours": 25,
+      "lives_alone": false,
+      "emergency_contact": {
+        "name": "Sarah Davis",
+        "relation": "grandson",
+        "phone": "+14085550179",
+        "language": "en"
+      },
+      "notes": "Demo data. Keeps insulin in the fridge."
+    },
+    {
+      "resident_id": "res-040",
+      "name": "Margaret Wilson",
+      "age": 80,
+      "phone": "+14085550140",
+      "address": "832 Fictional Oak Knoll Rd, San Jose, CA 95148",
+      "lat": 37.3608,
+      "lng": -121.8164,
+      "language": "en",
+      "devices": [
+        "other"
+      ],
+      "baseline_backup_hours": 4,
+      "lives_alone": false,
+      "emergency_contact": {
+        "name": "Chris Wilson",
+        "relation": "brother",
+        "phone": "+14085550180",
+        "language": "en"
+      },
+      "notes": "Demo data. Uses a powered medical bed and CPAP."
     }
   ]
 }

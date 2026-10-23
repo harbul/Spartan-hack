@@ -1,6 +1,6 @@
 {
   "_meta": {
-    "about": "Fictional demo resources: 2 PG&E-style Community Resource Centers and 1 pharmacy. One example record so far.",
+    "about": "Fictional demo resources: 2 PG&E-style Community Resource Centers and 1 pharmacy, all just outside the outage zone (they have power).",
     "plan": "§3 demo scenario, §4 Job 5 find_nearest_resource, §7 config.resources",
     "owner": "P4 (Story, data and video)",
     "shape": "backend/app/schemas.py Resource / frontend/src/api/types.ts Resource"
@@ -13,7 +13,39 @@
       "address": "200 Example Plaza Way, San Jose, CA 95127",
       "lat": 37.3382,
       "lng": -121.8224,
-      "offers": ["charging", "ice", "cooling", "water"]
+      "offers": [
+        "charging",
+        "ice",
+        "cooling",
+        "water"
+      ]
+    },
+    {
+      "resource_id": "crc-2",
+      "name": "Alum Rock Community Resource Center (Demo)",
+      "type": "resource_center",
+      "address": "88 Sample Library Ln, San Jose, CA 95127",
+      "lat": 37.399,
+      "lng": -121.827,
+      "offers": [
+        "charging",
+        "ice",
+        "cooling",
+        "water",
+        "oxygen_refill_referral"
+      ]
+    },
+    {
+      "resource_id": "pharm-1",
+      "name": "Evergreen Pharmacy (Demo)",
+      "type": "pharmacy",
+      "address": "410 Example Center Dr, San Jose, CA 95148",
+      "lat": 37.333,
+      "lng": -121.815,
+      "offers": [
+        "medication_resupply",
+        "ice"
+      ]
     }
   ]
 }
