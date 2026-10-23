@@ -2,7 +2,7 @@
 
 > *In a crisis, silence is the loudest signal.*
 >
-> Challenge reference: [Problem Statement doc](https://claude.ai/artifact/Rv3os67MtJTq94ratxuw1u). Re-read it before any scope decision.
+> Challenge reference: [Problem Statement doc](https://claude.ai/artifact/Rv3os67MtJTq94ratxuw1u). Re-read it before any scope decision. Every requirement from the challenge, rubric and judge instructions is mapped to this plan in [§1.1 Requirements compliance](#11-requirements-compliance-checklist).
 
 **TL;DR:** StillHere is a 3D emergency response command center for people whose lives depend on electricity during a California power shutoff. The coordinator watches the outage unfold on a satellite 3D map with an incident timeline, while Amazon Bedrock does the work at every step:
 - writes a personal check-in to every affected resident, in their language
@@ -21,7 +21,7 @@ The county coordinator approves every plan. Team of 4, Python + React, about 18 
 
 ## Contents
 
-1. [What the challenge really asks](#1-what-the-challenge-really-asks)
+1. [What the challenge really asks](#1-what-the-challenge-really-asks) (incl. [requirements compliance checklist](#11-requirements-compliance-checklist))
 2. [The solution](#2-the-solution-stillhere)
 3. [The demo scenario](#3-the-demo-scenario-golden-path)
 4. [Where Bedrock does real work](#4-where-bedrock-does-real-work)
@@ -54,8 +54,36 @@ The county coordinator approves every plan. Team of 4, Python + React, about 18 
 | **Polish: 10 pts** | It should look like something a county official would trust. |
 | **Above and beyond: 10 pts** | Real-world ambition: multilingual, safety, real data, extra channels. |
 | About 18 build hours; video due **10:30 AM Saturday** | Cut scope hard, freeze code early, and record a safety video. |
+| **Two judges, averaged, rotating pairs**; they score only what the video shows and says | The video must be self-explanatory to a stranger: captions, narration names every AWS service, nothing relies on prior context. |
+| Item 2 (works) and item 3 (Bedrock) are scored **separately** | A working app with a token Bedrock call loses item 3; a rich Bedrock integration that doesn't run loses item 2. We need both in the same continuous take. |
 
-The toolkit mentions Kiro, but the rubric does not score it. We will build with our usual tools.
+**Kiro.** The toolkit says *"Build with Kiro, and use Amazon Bedrock to power the AI inside your application."* The rubric does not score Kiro, but the organizers asked for it and every participant gets credits, so we use it: Kiro holds the spec (`.kiro/specs/stillhere/` with `requirements.md`, `design.md`, `tasks.md`, generated from this plan) and steering files (`.kiro/steering/` with the API contract, prompt rules and code style), and each person builds their tasks in Kiro. It costs about 20 minutes at H0 and gives us one honest line in the video ("specced and built with Kiro, powered by Amazon Bedrock"). Kiro is a build tool, **not** our AI service: the gate and item 3 are met only by Bedrock running inside the app.
+
+### 1.1 Requirements compliance checklist
+
+Every line below must be ticked before submitting. "Where in the video" is what the judges will actually see; if it is not on screen, it does not count.
+
+| # | Requirement (from the challenge, rubric and judge instructions) | How StillHere meets it | Plan section | Where in the video |
+|---|---|---|---|---|
+| R1 | **Gate:** the app uses an AWS AI service (Amazon Bedrock) doing real work | Five Bedrock jobs plus Guardrails; the app cannot triage, message or plan without them | §4 | Said by name in the first 35 s; live in the demo; Trace drawer at 3:30 |
+| R2 | Name a **specific persona** who depends on a critical service | Dana Nguyen, Medical Needs Coordinator, plus the electricity-dependent residents she is accountable for | §2 | 0:00–0:35 |
+| R3 | A **real continuity problem** during a crisis (supply shock, disaster, outage) | PG&E Public Safety Power Shutoff cuts power that medical devices and medicine depend on; the phone tree misses the people who don't answer | §2, §18 sources | 0:00–0:35, with cited stats on screen |
+| R4 | The "so what" is clear and **drove the build** | "Silence is a signal" drives the escalation ladder, the timeline and the door-knock stops | §2, §5 | 0:20–0:35 and the Lupe moment in the demo |
+| R5 | An **AI application**, not just an app written with AI | Bedrock writes, reads, explains, escalates and plans at runtime; every call is traced | §4 | Demo plus Trace drawer |
+| R6 | Built **on AWS**, in the provided AWS account | Bedrock, Location, Lambda, API Gateway, DynamoDB, S3, EventBridge, Amplify, SAM | §6 | Architecture segment |
+| R7 | Built **with Kiro** (toolkit) | Spec and steering in `.kiro/`; tasks built in Kiro | §1, §10 | One line plus a 2 s Kiro spec shot in the architecture segment |
+| R8 | A **working** application that solves the need **end to end**, shipped not started | One continuous take on the deployed Amplify URL: zone → check-ins → replies → escalation → plan → approve → volunteer marks done | §3, §11 MUST | 1:00–3:30 |
+| R9 | Bedrock is **integral, not bolted on**, and shown working | "Amazon Bedrock" badge on every AI action in the UI; tool calls stream live; Guardrail block shown | §4, §9 | Demo plus 3:30–4:10 |
+| R10 | The team **understands what it built** | Diagram with a reason for each service; stated principle "AI reads and explains, rules rank, humans decide"; why scoring is deterministic | §5, §6 | 0:35–1:00 and the deep dive |
+| R11 | **Polish:** looks like something a real person would trust | 3D satellite command center, calm panels, approval step, audit trail, "AI-estimated" labels, Demo data labels | §9 | Whole demo |
+| R12 | **Above and beyond:** ambition or real-world impact | Silence detection, 3 languages, photo replies, Guardrails, privacy-safe SMS, sourced data, production path (real SMS, Connect voice, county registries) | §11 SHOULD | 4:10–4:30 |
+| R13 | Video is **5 minutes or less** | Scripted to 4:45, leaving a 15 s buffer | §14 | Whole video |
+| R14 | Video shows the **architecture** | Diagram segment | §6, §14 | 0:35–1:00 |
+| R15 | Video **describes the application, persona and need** | Hook and persona segment, plus narration over the demo | §14 | 0:00–0:35 |
+| R16 | Video shows **Bedrock in use** (AWS AI services actually working) | Live demo plus Trace drawer close-ups of real calls | §14 | 1:00–4:10 |
+| R17 | Submitted by **10:30 AM Saturday** | Internal deadline 9:30 AM; safety video exists from H8 | §13 | n/a |
+| R18 | A **way for judges to reach the team** through the event channel | Names and event-channel handle on the end card; contact posted in the channel at submission | §13, §14 | 4:35–4:45 end card |
+| R19 | No live Q&A, so **nothing can depend on explaining later** | Captions, on-screen labels, "⏩ sped up" marks, cold-judge test with the official score sheet | §14, §17 | Whole video |
 
 ---
 
@@ -300,6 +328,8 @@ Base URL: `${VITE_API_URL}`. All responses are JSON.
 
 Stack: React, Vite, TypeScript, Tailwind, MapLibre GL, and TanStack Query polling every 3 s.
 
+**Make Bedrock visible everywhere (rubric gate and item 3).** Every AI-produced element carries a small "Amazon Bedrock" badge: check-in texts, translations, the "why" on each card, escalation messages and each plan reason. Loading states name the work, for example "Amazon Bedrock is reading Minh's reply…". A judge watching without sound should still see that Bedrock does the work.
+
 1. **Command center (`/`)**, laid out in four areas like FireTrace:
    - **Top bar:** StillHere logo, incident name ("East San Jose PSPS"), area, outage window, Reset demo button, About.
    - **Center: 3D incident map** (the largest area).
@@ -333,7 +363,11 @@ Spartan-hack/
 │   ├── PLAN.md               ← this file
 │   ├── architecture.png
 │   ├── video_script.md
+│   ├── submission.md         ← video link, team contacts, R1–R19 tick list from §1.1
 │   └── sources.md            ← cited stats for the persona
+├── .kiro/
+│   ├── specs/stillhere/      ← requirements.md, design.md, tasks.md (from this plan)
+│   └── steering/             ← api-contract.md, prompt-rules.md, code-style.md
 ├── data/
 │   ├── residents.json        ← ~40 synthetic residents (5 hero residents from §3)
 │   ├── outage_zone.geojson
@@ -431,7 +465,7 @@ H0 is when hacking starts.
 
 | Hours | P1 Frontend | P2 Backend | P3 AI | P4 Story and data | Gate |
 |---|---|---|---|---|---|
-| **H0–H1** | Vite app, Tailwind, MapLibre with the Location satellite style; **test 3D terrain on a throwaway page** | SAM skeleton, hello route deployed | **Request Bedrock model access first**; hello `converse()` | Repo docs, start `residents.json` | **Deployed URL returns a Bedrock reply; 3D path chosen (Amazon or fallback)** |
+| **H0–H1** | Vite app, Tailwind, MapLibre with the Location satellite style; **test 3D terrain on a throwaway page** | SAM skeleton, hello route deployed | **Request Bedrock model access first**; hello `converse()` | Generate the Kiro spec and steering from this plan; start `residents.json` | **Deployed URL returns a Bedrock reply; 3D path chosen (Amazon or fallback); Kiro spec committed** |
 | H1–H4 | Four-area layout, flat map, timeline bar, simulator on mock JSON | Tables (incl. `events`), `/demo/reset`, `/outages`, point-in-polygon | Jobs 1 and 2 with tool schema; trace logging | Residents, zone, resources, volunteers, 20 test replies | Each part works alone |
 | H4–H6 | Wire to the live API, polling; counters and markers from `/dashboard` | `/inbound`, `/clock/advance`, triage, escalation, event writes | Jobs 3 and 4; eval run | Persona sources; script draft | Replies flow into the queue and onto the map |
 | H6–H7 | Routes on the map, Plan tab, volunteer view | `OptimizeWaypoints` + `CalculateRoutes`, `/plans` | Job 5 agent loop | Architecture diagram v1 | Plan renders |
@@ -440,39 +474,47 @@ H0 is when hacking starts.
 | H12–H14 | Stretch UI or polish | Stretch or hardening | Stretch (KB or SITREP) | Shot list, final script | Green or harden |
 | **H14–H15** | **Code freeze.** All: 3 clean runs from reset; fix blockers only | | | | 3 clean runs in a row |
 | H15–H17 | Screen recording support | Standby for fixes | Trace drawer close-ups | Record, voiceover, edit, captions | Final cut |
-| H17–H18 | All: watch it cold with the score sheet; submit **by 9:30 AM** and post contact info in the event channel | | | | **Submitted** |
+| H17–H18 | All: watch it cold with the official score sheet and tick R1–R19 in §1.1; confirm runtime is 5:00 or less; submit **by 9:30 AM** and post contact info in the event channel | | | | **Submitted** |
 
 ---
 
 ## 14. The 5-minute video
 
+The challenge asks for three things: **architecture**, **the application with its persona and need**, and **Amazon Bedrock in use**. Each has its own labeled segment below, and an on-screen chapter title ("1 · The problem", "2 · Architecture", "3 · Live demo", "4 · Amazon Bedrock inside", "5 · Impact") so a judge can tick each one off. **Target runtime 4:45**; the hard limit is 5:00.
+
 | Time | Segment | On screen |
 |---|---|---|
-| 0:00–0:35 | **Hook and persona.** Open on the 3D satellite view of the East San Jose foothills at dusk. "At 6 PM the power goes off. In some of these homes, someone's life runs on electricity." Dana's problem: a phone tree, and the people who don't answer get missed. | 3D map, sourced stats, Dana's spreadsheet compared with StillHere |
-| 0:35–1:05 | **Architecture.** Each AWS service and why it's there. "AI reads and explains, rules rank, humans decide." | Diagram (§6) |
-| 1:05–3:45 | **Live demo**, one continuous take on the deployed URL: load the zone → the red overlay appears and 40 markers drop in → send check-ins (3 languages appear in the phone) → Minh replies in Vietnamese with a gauge photo → his marker turns red; click it, the camera flies to his home, the panel shows the "why" → Rosa and Harold reply; Denise turns green → **press play on the timeline**: counters tick, event markers appear, Lupe's marker pulses harder, her daughter is texted, a door-knock is added → **Plan dispatch**: the agent's tool calls stream → routes draw across the terrain → **Approve** → the volunteer's phone route sheet | Command center, phone simulator, volunteer view |
-| 3:45–4:25 | **Bedrock deep dive.** Open the AI Trace drawer: Minh's call (image in, JSON out), the agent's tool-call sequence, a Guardrail blocking dosage advice. Show the `converse()` code briefly. | Trace drawer, code |
-| 4:25–4:50 | **Above and beyond, and impact.** Silence as signal, 3 languages, photos, human approval; path to real SMS, a Connect voice line and county registries | Feature montage |
-| 4:50–5:00 | Team names and contact | End card |
+| 0:00–0:35 | **Hook and persona.** Open on the 3D satellite view of the East San Jose foothills at dusk. "At 6 PM the power goes off. In some of these homes, someone's life runs on electricity." Dana's problem: a phone tree, and the people who don't answer get missed. Close with the one-sentence answer: "StillHere is an AI application on AWS, powered by Amazon Bedrock, that reaches every one of them and notices who goes silent." | 3D map, sourced stats, Dana's spreadsheet compared with StillHere |
+| 0:35–1:00 | **Architecture.** Each AWS service and why it's there, Bedrock first. "AI reads and explains, rules rank, humans decide." One line: "Specced and built with Kiro." | Diagram (§6), 2 s of the Kiro spec |
+| 1:00–3:30 | **Live demo**, one continuous take on the deployed URL: load the zone → the red overlay appears and 40 markers drop in → send check-ins (3 languages appear in the phone) → Minh replies in Vietnamese with a gauge photo → his marker turns red; click it, the camera flies to his home, the panel shows the "why" → Rosa and Harold reply; Denise turns green → **press play on the timeline**: counters tick, event markers appear, Lupe's marker pulses harder, her daughter is texted, a door-knock is added → **Plan dispatch**: the agent's tool calls stream → routes draw across the terrain → **Approve** → the volunteer's phone route sheet | Command center, phone simulator, volunteer view |
+| 3:30–4:10 | **Bedrock deep dive.** Open the AI Trace drawer: Minh's call (image in, JSON out), the agent's tool-call sequence, a Guardrail blocking dosage advice. Show the `converse()` code briefly. Name the five jobs out loud. | Trace drawer, code |
+| 4:10–4:35 | **Above and beyond, and impact.** Silence as signal, 3 languages, photos, human approval; path to real SMS, a Connect voice line and county registries | Feature montage |
+| 4:35–4:45 | Team names and how judges can reach us (event-channel handle) | End card |
 
 **Recording rules:**
 - 1080p, browser zoom at 110%, notifications off.
 - Voiceover recorded separately, then synced.
 - Captions on.
 - Any trimmed wait gets an on-screen "⏩ sped up".
+- Say "Amazon Bedrock" out loud at least once in the first minute and again during the demo; the gate is the first thing judges check.
+- The demo segment is a real, unedited run on the deployed URL (trims for waiting only). Never mock a step on camera: item 2 is the first tie-break.
+- Put the deployed URL on screen during the demo, so it is clearly shipped.
 
 ---
 
 ## 15. Rubric scorecard
 
-| Item | Target | How we reach Strong |
-|---|---|---|
-| 1. Persona (20) | Strong | Named coordinator, a real PSPS context, cited stats, the Lupe "silent resident" story |
-| 2. Working (25) | Strong | One continuous end-to-end take on a deployed URL; resettable; 3 clean rehearsals |
-| 3. Bedrock (20) | Strong | 5 distinct jobs, including a multimodal extractor and a tool-use agent, shown in the Trace drawer, plus Guardrails |
-| 4. Understanding (15) | Strong | Clear diagram, a stated design principle, the reason scoring is deterministic |
-| 5. Polish (10) | Strong | 3D satellite command center with a playback timeline; calm, consistent panels; an approval step; an audit trail |
-| 6. Above and beyond (10) | Strong | Silence detection made visible over time, 3 languages, photos, Guardrails, privacy-safe SMS, sourced real data, channel roadmap |
+| Item | Target | How we reach Strong | Shown at |
+|---|---|---|---|
+| **Gate:** AWS AI service | Pass | Bedrock named in the first minute, badged in the UI, proven in the Trace drawer | 0:30, 1:00–4:10 |
+| 1. Persona (20) | Strong | Named coordinator, a real PSPS context, cited stats, the Lupe "silent resident" story | 0:00–0:35, Lupe in demo |
+| 2. Working (25) | Strong | One continuous end-to-end take on a deployed URL; resettable; 3 clean rehearsals | 1:00–3:30 |
+| 3. Bedrock (20) | Strong | 5 distinct jobs, including a multimodal extractor and a tool-use agent, shown in the Trace drawer, plus Guardrails | Demo, 3:30–4:10 |
+| 4. Understanding (15) | Strong | Clear diagram, a stated design principle, the reason scoring is deterministic | 0:35–1:00, deep dive |
+| 5. Polish (10) | Strong | 3D satellite command center with a playback timeline; calm, consistent panels; an approval step; an audit trail | Whole demo |
+| 6. Above and beyond (10) | Strong | Silence detection made visible over time, 3 languages, photos, Guardrails, privacy-safe SMS, sourced real data, channel roadmap | 4:10–4:35 |
+
+Tie-breaks run in the order item 2, item 1, item 3, which matches where we spend the most effort: the golden path first, the persona story second, Bedrock depth third.
 
 ---
 
@@ -519,3 +561,5 @@ H0 is when hacking starts.
   - One documented outage-related harm
 - [ ] **Assets:** wireframes of the four-area command center (use FireTrace as the reference), the phone simulator and the volunteer view; a draft of the architecture diagram.
 - [ ] **Accounts:** an Amplify app connected to this repo; a screen recorder ready (for example OBS).
+- [ ] **Kiro:** installed on every laptop, credits activated, signed in.
+- [ ] **Submission:** confirm with organizers where the video is uploaded (form, Devpost, YouTube unlisted?), the accepted format, and the event communication channel for judge questions. Record answers in `docs/submission.md`.
