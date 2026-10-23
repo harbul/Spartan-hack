@@ -133,6 +133,8 @@ All data is synthetic, using 555 phone numbers. There are about 40 residents in 
 | **Denise Okafor**, 55 | English, home dialysis | "Generator running, all good, thanks" | AI also **de-prioritizes**: case marked OK |
 | **Lupe Ramírez**, 89 | Spanish, oxygen, lives alone | **Never replies** | Silence escalation: re-ping → daughter contacted → door-knock stop. This is the hero moment. |
 
+Everyone else replies too: 16 background residents send labeled test replies and 16 send simple OK replies (`data/crowd_replies.json`). Only Lupe and three others stay silent, so silence stands out and the plan stays within 3 volunteers × 6 stops.
+
 Resources on the map are fictional for the demo: 2 PG&E-style Community Resource Centers and 1 pharmacy. Volunteers: 3, each with a vehicle type.
 
 ---
@@ -372,7 +374,8 @@ Spartan-hack/
 │   ├── outage_zone.geojson
 │   ├── resources.json        ← resource centers, pharmacy
 │   ├── volunteers.json
-│   └── test_replies.json     ← 20 labeled replies (eval + quick replies)
+│   ├── test_replies.json     ← 20 labeled replies (eval + quick replies)
+│   └── crowd_replies.json    ← 16 simple OK replies, so only 4 residents stay silent
 ├── backend/
 │   ├── app/
 │   │   ├── main.py           ← FastAPI routes + Mangum handler
@@ -553,14 +556,14 @@ Tie-breaks run in the order item 2, item 1, item 3, which matches where we spend
   - `test_geo.py`: points inside, outside and on the edge of the polygon
 - **AI eval** (`backend/tests/eval_replies.py`): 20 labeled replies (EN/ES/VI, typos, ambiguous replies, 2 photos). Pass at 18/20 or better on need type and priority band before H8. Rerun after every prompt change.
 - **Privacy check:** every Job 1 and Job 4 resident message in the eval run is checked for device or diagnosis words (oxygen, dialysis, insulin, wheelchair, and their ES/VI forms). Any hit fails the run.
-- **Golden-path script:** reset → zone → check-ins → 4 replies → timeline +3h → plan → approve → mark one stop done. At each step, the map markers, counters and Key events list must match the case statuses. Pass when it runs on the deployed URL **3 times in a row** with no manual fixes, and each Bedrock step stays under about 6 s (agent under about 20 s).
+- **Golden-path script:** reset → zone → check-ins → 4 hero replies → crowd replies (the other 16 test replies plus `data/crowd_replies.json`) → timeline +3h → plan → approve → mark one stop done. At each step, the map markers, counters and Key events list must match the case statuses. Pass when it runs on the deployed URL **3 times in a row** with no manual fixes, and each Bedrock step stays under about 6 s (agent under about 20 s).
 - **Cold-judge test:** someone outside the team scores the final video with the official score sheet. Fix anything they could not see.
 
 ---
 
 ## 18. Pre-event checklist and open questions
 
-- [ ] **Rules:** may code be written before hacking starts? If not, prepare only docs, data and design before H0.
+- [x] **Rules:** may code be written before hacking starts? **Yes (answered 2026-10-23).** The AWS account only arrives at H0.
 - [ ] **Event schedule:** confirm the exact start time so H0 to H18 maps to the clock.
 - [ ] **AWS account:** region, and Bedrock model access for one fast and one strong Claude model.
 - [ ] **Amazon Location:** confirm the satellite/hybrid map style, 3D terrain and `OptimizeWaypoints` are available in our region with an API key. If 3D terrain is not, get a Mapbox token ready as the fallback.

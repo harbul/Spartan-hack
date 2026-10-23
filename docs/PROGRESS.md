@@ -306,6 +306,8 @@ Decisions that change or clarify the plan. If one changes the plan, `PLAN.md` is
 | 2026-10-23 | The 1-minute schedule sends `{"stillhere": "escalation_check"}`; `main.handler` routes it | Simple, explicit routing; the schedule is back on | Claude session |
 | 2026-10-23 | `VITE_USE_MOCK=true` keeps the screens on the mock until the AWS gate; delete the mock in H7–H8 | The team can keep building screens offline | Claude session |
 | 2026-10-23 | Display categories: ok/resolved = Safe; awaiting_reply/escalated/silent = No reply; needs_help/dispatched = Critical if band Critical, else Needs help | One rule (`categoryOf`) for markers, cards and counters; `/dashboard` counts should use the same rule | Claude session |
+| 2026-10-23 | **Silence flood fixed with crowd replies** (option a): after the 4 hero replies, the other 16 test replies and 16 simple OK replies (`data/crowd_replies.json`) arrive; only 4 residents stay silent | Without it, 36 residents go silent at +3 h, swamping the plan (18 stops) and hiding Lupe. Keeps 40 households on the map. Closes the Silence flood question | Team (chosen), Claude session |
+| 2026-10-23 | Test-reply bands must hold with distress ±1 (no score on a 30/60/80 cut-off) | Job 2 distress is a judgment call; a one-notch miss shouldn't flip a band in the eval or on camera. Rosa now lives alone (70, was 60). Closes the Rosa question | Claude session |
 
 ---
 

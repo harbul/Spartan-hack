@@ -20,6 +20,10 @@ from app.schemas import Assessment, Escalation
 T0 = datetime(2026, 10, 24, 1, 0, tzinfo=timezone.utc)
 ZONE = json.loads((store.seed_dir() / "outage_zone.geojson").read_text())["features"][0]["geometry"]
 REPLIES = {r["resident_id"]: r for r in json.loads((store.seed_dir() / "test_replies.json").read_text())["replies"]}
+OK = {"status": "ok", "needs": [], "supply_hours_left": None, "needs_transport": False, "distress_level": 0}
+CROWD = {c["resident_id"]: {**c, "expected": {**OK, **c["expected"]}} for c in store.load_seed("crowd_replies")}
+REPLIES.update(CROWD)  # the stand-in Job 2 reads a crowd reply as a confident OK
+HEROES = ["res-001", "res-002", "res-003", "res-004"]
 PHONES = {r["resident_id"]: r["phone"] for r in store.load_seed("residents")}
 PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 16
 client = TestClient(app)
@@ -106,6 +110,34 @@ def test_golden_path_to_the_dashboard(api):
     assert [(m["direction"], m["channel"]) for m in thread] == [("out", "sms"), ("in", "sms")]
     assert thread[1]["translation_en"].startswith("EN:") and thread[1]["image_key"].endswith(".png")
     assert [m["channel"] for m in client.get("/residents/res-005/messages").json()["messages"]] == ["sms", "sms", "contact", "door"]
+
+
+def test_others_reply_leaves_only_four_silent(api):
+    """With the "Others reply" step (phone simulator), silence is the signal again (§3)."""
+    client.post("/demo/reset")
+    outage = client.post("/outages", json={
+        "name": "East San Jose PSPS", "polygon": ZONE,
+        "starts_at": escalation.iso(T0), "est_restore_at": escalation.iso(T0 + timedelta(hours=14)),
+    }).json()
+    client.post(f"/outages/{outage['outage_id']}/checkins")
+    client.post("/clock/advance", json={"minutes": 10})
+    others = [rid for rid in REPLIES if rid not in HEROES]
+    assert len(others) == 32
+    for rid in HEROES + others:
+        reply(rid)
+
+    advanced = client.post("/clock/advance", json={"minutes": 180}).json()
+    silent = {"res-005", "res-025", "res-036", "res-039"}
+    assert {e["resident_id"] for e in advanced["escalations"]} == silent
+    assert len(advanced["escalations"]) == 12  # L1-L3 for 4 residents: 12 Job 4 drafts, not ~108
+
+    dash = client.get("/dashboard").json()
+    cases = by_id(dash)
+    assert {rid for rid, c in cases.items() if c["status"] == "silent"} == silent
+    assert dash["counts"]["no_reply"] == 4
+    assert cases["res-005"]["band"] == "Critical"
+    assert sum(dash["counts"].values()) == 40
+    assert [e["type"] for e in dash["events"]].count("reply") == 36
 
 
 def test_unknown_phone_and_bad_input(api):

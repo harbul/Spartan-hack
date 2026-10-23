@@ -2,8 +2,8 @@
  * MOCK (H1-H4): a /dashboard response built from the seed data, so the screens
  * can be built before the API exists. It follows the demo story over virtual time:
  *   +5 min   check-ins sent to all 40 residents
- *   replies  the 20 labeled test replies, then most others reply "1"
- *   silence  Lupe and three others never reply and climb the §5 ladder
+ *   replies  the 20 labeled test replies, then the 16 crowd replies (data/crowd_replies.json)
+ *   silence  Lupe and three others (no reply in either file) climb the §5 ladder
  *            (L1 30 min, L2 60, L3 90; halved for oxygen and dialysis)
  *   plan     "Plan dispatch" drafts a plan from the open cases (round-robin, straight
  *            lines); "Approve" dispatches them; "Mark done" resolves a stop
@@ -12,7 +12,7 @@
  *
  * Owner: P1 (Frontend and UX).
  */
-import { residents, resources, testReplies, volunteers, zonePolygon, type TestReply } from './seed';
+import { crowdReplies, residents, resources, testReplies, volunteers, zonePolygon, type TestReply } from './seed';
 import { givenName } from '../components/status';
 import type {
   Assessment,
@@ -32,7 +32,9 @@ const START = '2026-10-24T01:00:00Z'; // 6 PM PDT, Friday Oct 23
 const OUTAGE_HOURS = 14;
 const CHECKINS_AT = 5;
 const OUTAGE_ID = 'out-mock';
-const SILENT = new Set(['res-005', 'res-025', 'res-036', 'res-039']);
+const CROWD_TEXT = new Map(crowdReplies.map((r) => [r.resident_id, r.text]));
+const REPLIED = new Set([...testReplies.map((r) => r.resident_id), ...CROWD_TEXT.keys()]);
+const SILENT = new Set(residents.map((r) => r.resident_id).filter((id) => !REPLIED.has(id)));
 const REPLY_AT = [22, 12, 26, 9, 31, 18, 7, 15, 35, 11, 20, 8, 28, 40, 10, 24, 33, 45, 17, 14];
 
 const HERO_WHY: Record<string, string> = {
@@ -102,7 +104,7 @@ function caseAt(resident: Resident, index: number, minute: number): Case {
       band,
       priority: PRIORITY[band],
       assessment,
-      rationale: HERO_WHY[resident.resident_id] ?? (labeled ? `Reply: "${labeled.reply.text}"` : 'Replied 1: OK'),
+      rationale: HERO_WHY[resident.resident_id] ?? `Reply: "${labeled?.reply.text ?? CROWD_TEXT.get(resident.resident_id) ?? '1'}"`,
       last_inbound_at: at(replyMinute),
       needs_review: (assessment?.confidence ?? 1) < 0.6,
     };
@@ -263,7 +265,7 @@ export function mockMessages(residentId: string, minute: number): Message[] {
       ts: c.last_inbound_at,
       direction: 'in',
       channel: 'sms',
-      text: reply?.text ?? '1',
+      text: reply?.text ?? CROWD_TEXT.get(residentId) ?? '1',
       translation_en: null,
       image_key: reply?.image ?? null,
       trace_id: null,

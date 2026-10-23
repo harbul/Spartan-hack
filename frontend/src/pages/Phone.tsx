@@ -2,6 +2,8 @@
  * Resident phone simulator (/phone): phone frame, resident picker, SMS thread,
  * text box, photo attach (resized under 1 MB), and quick replies from
  * data/test_replies.json. Posts to the same /inbound webhook real SMS would use.
+ * "Others reply" sends every non-hero reply (the other test replies plus
+ * data/crowd_replies.json) so only Lupe and three others stay silent (§3).
  *
  * "Others reply (demo)" sends everyone else's reply through the same /inbound, so
  * only the heroes and a few chosen residents stay silent (simulated residents,
@@ -116,6 +118,29 @@ export default function Phone() {
     setText('');
     setPhoto(null);
   };
+
+  const sendOthers = async () => {
+    if (USE_MOCK || (others && others.done < othersReplies.length)) return;
+    const progress = { done: 0, failed: 0 };
+    setOthers({ ...progress });
+    setOthersError(null);
+    const queue = [...othersReplies];
+    const worker = async () => {
+      for (let body = queue.shift(); body; body = queue.shift()) {
+        try {
+          await sendInbound(body);
+        } catch (err) {
+          progress.failed += 1;
+          setOthersError((err as Error).message);
+        }
+        progress.done += 1;
+        setOthers({ ...progress });
+      }
+    };
+    await Promise.all(Array.from({ length: OTHERS_PARALLEL }, worker));
+    await queryClient.invalidateQueries();
+  };
+  const othersRunning = others !== null && others.done < othersReplies.length;
 
   const attach = async (file: File | undefined) => {
     setError(null);

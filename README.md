@@ -23,7 +23,8 @@ Spartan-hack/
 │   ├── outage_zone.geojson   PSPS polygon over East San Jose
 │   ├── resources.json        resource centers and pharmacy
 │   ├── volunteers.json       3 volunteers with vehicles
-│   └── test_replies.json     20 labeled replies (eval + phone quick replies)
+│   ├── test_replies.json     20 labeled replies (eval + phone quick replies)
+│   └── crowd_replies.json    16 simple OK replies; everyone else stays silent (4 residents)
 ├── backend/                  Python 3.12, FastAPI on Lambda
 │   ├── app/
 │   │   ├── main.py           API routes (§8) + Lambda handler
