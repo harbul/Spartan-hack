@@ -7,13 +7,17 @@ Implements: PLAN.md §8 (API contract), §6 (Lambda + Mangum).
 Owner: P2 (Backend and infra).
 """
 
+import uuid
+
 from botocore.exceptions import BotoCoreError, ClientError
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from mangum import Mangum
 
-from app import bedrock
+from app import bedrock, geo, store
 from app.schemas import (
+    Case,
     CaseResponse,
     CheckinsResponse,
     ClockAdvanceRequest,
@@ -22,8 +26,10 @@ from app.schemas import (
     CreateOutageResponse,
     CreatePlanRequest,
     DashboardResponse,
+    Event,
     InboundRequest,
     MessagesResponse,
+    Outage,
     PlanResponse,
     RunResponse,
     TracesResponse,
@@ -41,6 +47,29 @@ app.add_middleware(
 )
 
 
+# Clear errors instead of a bare 500, so a missing setting is obvious from the frontend.
+
+
+@app.exception_handler(bedrock.BedrockNotConfigured)
+@app.exception_handler(store.StoreNotConfigured)
+def not_configured(request: Request, err: Exception) -> JSONResponse:
+    return JSONResponse(status_code=503, content={"detail": str(err)})
+
+
+@app.exception_handler(ClientError)
+def aws_client_error(request: Request, err: ClientError) -> JSONResponse:
+    # e.g. AccessDeniedException (model access not granted), ResourceNotFoundException (table)
+    error = err.response.get("Error", {})
+    detail = f"{err.operation_name} {error.get('Code')}: {error.get('Message')}"
+    return JSONResponse(status_code=502, content={"detail": detail})
+
+
+@app.exception_handler(BotoCoreError)
+def aws_setup_error(request: Request, err: BotoCoreError) -> JSONResponse:
+    # e.g. no AWS credentials or region locally
+    return JSONResponse(status_code=502, content={"detail": f"AWS: {err}"})
+
+
 @app.get("/health")
 def health() -> dict:
     return {"ok": True}
@@ -52,29 +81,17 @@ def health() -> dict:
 @app.get("/hello-bedrock")
 def hello_bedrock() -> dict:
     """One real Bedrock call through converse(), to prove the deploy reaches the model."""
-    try:
-        result = bedrock.converse(
-            job="hello",
-            system="You are the AI inside StillHere, an emergency response command center.",
-            messages=[
-                {
-                    "role": "user",
-                    "content": [{"text": "In one short sentence, say hello to the StillHere team."}],
-                }
-            ],
-            max_tokens=100,
-        )
-    except bedrock.BedrockNotConfigured as err:
-        raise HTTPException(status_code=503, detail=str(err)) from err
-    except ClientError as err:
-        # e.g. AccessDeniedException: model access not granted, or a wrong model ID.
-        error = err.response.get("Error", {})
-        raise HTTPException(
-            status_code=502, detail=f"Bedrock {error.get('Code')}: {error.get('Message')}"
-        ) from err
-    except BotoCoreError as err:
-        # e.g. no AWS credentials or region locally.
-        raise HTTPException(status_code=502, detail=f"Bedrock: {err}") from err
+    result = bedrock.converse(
+        job="hello",
+        system="You are the AI inside StillHere, an emergency response command center.",
+        messages=[
+            {
+                "role": "user",
+                "content": [{"text": "In one short sentence, say hello to the StillHere team."}],
+            }
+        ],
+        max_tokens=100,
+    )
     return {
         "reply": result.text,
         "model_id": result.model_id,
@@ -90,13 +107,42 @@ def hello_bedrock() -> dict:
 @app.post("/demo/reset")
 def reset_demo() -> None:
     """Reseed from data/, clear cases, messages, plans and traces, clock offset to 0."""
-    ...
+    store.reset_demo()
 
 
 @app.post("/outages")
 def create_outage(body: CreateOutageRequest) -> CreateOutageResponse:
     """Create the outage and find affected residents (geo.point_in_polygon)."""
-    ...
+    affected = [
+        r.resident_id
+        for r in store.list_residents()
+        if geo.point_in_polygon(r.lat, r.lng, body.polygon)
+    ]
+    outage = Outage(
+        outage_id=f"out-{uuid.uuid4().hex[:8]}",
+        name=body.name,
+        polygon=body.polygon,
+        starts_at=body.starts_at,
+        est_restore_at=body.est_restore_at,
+        affected_ids=affected,
+        status="active",
+    )
+    store.put_outage(outage)
+    store.put_cases(
+        [
+            Case(outage_id=outage.outage_id, resident_id=rid, status="not_contacted", priority=0, band="OK")
+            for rid in affected
+        ]
+    )
+    store.add_event(
+        Event(
+            outage_id=outage.outage_id,
+            ts=body.starts_at,
+            type="outage_started",
+            label=f"Outage started: {len(affected)} registered residents affected",
+        )
+    )
+    return CreateOutageResponse(outage_id=outage.outage_id, affected=affected)
 
 
 @app.post("/outages/{outage_id}/checkins")
