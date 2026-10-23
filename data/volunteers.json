@@ -1,0 +1,18 @@
+{
+  "_meta": {
+    "about": "Fictional demo volunteers (3), each with a vehicle type and start location. One example record so far. Phones use 555 numbers.",
+    "plan": "§3 demo scenario, §4 Job 5 list_volunteers, §7 config.volunteers",
+    "owner": "P4 (Story, data and video)",
+    "shape": "backend/app/schemas.py Volunteer / frontend/src/api/types.ts Volunteer"
+  },
+  "volunteers": [
+    {
+      "volunteer_id": "vol-1",
+      "name": "Sam Rivera",
+      "phone": "+14085550181",
+      "vehicle": "suv",
+      "start": { "lat": 37.3521, "lng": -121.8402 },
+      "capacity": 3
+    }
+  ]
+}

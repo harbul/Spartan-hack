@@ -1,7 +1,21 @@
+# Files git ignores: secrets, dependencies, build output. Owner: P2.
 .DS_Store
 .claude/settings.local.json
-node_modules/
+
+# Secrets: only .env.example is committed
 .env
-.env.local
+.env.*
+!.env.example
+
+# Frontend
+node_modules/
+frontend/dist/
+
+# Backend
 __pycache__/
 .venv/
+.pytest_cache/
+
+# SAM
+.aws-sam/
+samconfig.toml

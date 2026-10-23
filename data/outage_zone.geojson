@@ -1,0 +1,30 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "about": "Placeholder PSPS outage zone over the East San Jose foothills. P4 replaces the polygon; keep it along the hills so 3D terrain reads well (PLAN.md §16).",
+        "plan": "§3 demo scenario, §7 outages.polygon, §8 POST /outages",
+        "owner": "P4 (Story, data and video)",
+        "name": "East San Jose PSPS",
+        "starts_local": "18:00",
+        "est_restore_local": "08:00 next day",
+        "outage_hours": 14
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-121.835, 37.345],
+            [-121.775, 37.345],
+            [-121.765, 37.395],
+            [-121.820, 37.405],
+            [-121.840, 37.375],
+            [-121.835, 37.345]
+          ]
+        ]
+      }
+    }
+  ]
+}

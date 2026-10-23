@@ -357,9 +357,11 @@ Stack: React, Vite, TypeScript, Tailwind, MapLibre GL, and TanStack Query pollin
 
 ```
 Spartan-hack/
-├── README.md
+├── README.md                 ← folder map, ownership, how to run
+├── .env.example              ← every env var, one line each
 ├── docs/
 │   ├── PLAN.md               ← this file
+│   ├── PROGRESS.md           ← phase status, scope tracker, decisions, open questions
 │   ├── architecture.png
 │   ├── video_script.md
 │   ├── submission.md         ← video link, team contacts, R1–R18 tick list from §1.1
@@ -373,7 +375,8 @@ Spartan-hack/
 ├── backend/
 │   ├── app/
 │   │   ├── main.py           ← FastAPI routes + Mangum handler
-│   │   ├── bedrock.py        ← converse() wrapper, tracing, guardrails
+│   │   ├── schemas.py        ← shared contract: Pydantic models for §7 and §8
+│   │   ├── bedrock.py        ← converse() wrapper, tracing, guardrails, Jobs 1–4
 │   │   ├── prompts/          ← checkin.md, assess.md, explain.md, escalate.md, planner.md
 │   │   ├── tools.py          ← tool schemas + implementations for the agent
 │   │   ├── agent.py          ← tool-use loop
@@ -386,15 +389,16 @@ Spartan-hack/
 │   │   ├── test_triage.py
 │   │   ├── test_geo.py
 │   │   └── eval_replies.py   ← runs Job 2 against test_replies.json
+│   ├── pytest.ini
 │   └── requirements.txt
 ├── frontend/
 │   └── src/
 │       ├── pages/            ← CommandCenter, Phone, RunSheet
 │       ├── components/
-│       │   ├── map/          ← IncidentMap (3D), layers: zone, residents, routes, resources
+│       │   ├── map/          ← IncidentMap (3D), layers/: zone, residents, routes, resources
 │       │   ├── timeline/     ← Timeline, KeyEvents, Counters
 │       │   └── panels/       ← Overview, TriageQueue, ResidentPanel, TraceDrawer, PlanPanel
-│       └── api/
+│       └── api/types.ts      ← shared contract: TypeScript mirror of schemas.py
 └── infra/
     └── template.yaml         ← SAM: Lambda, HTTP API, tables, bucket, schedule, IAM
 ```

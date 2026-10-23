@@ -1,0 +1,19 @@
+{
+  "_meta": {
+    "about": "Fictional demo resources: 2 PG&E-style Community Resource Centers and 1 pharmacy. One example record so far.",
+    "plan": "§3 demo scenario, §4 Job 5 find_nearest_resource, §7 config.resources",
+    "owner": "P4 (Story, data and video)",
+    "shape": "backend/app/schemas.py Resource / frontend/src/api/types.ts Resource"
+  },
+  "resources": [
+    {
+      "resource_id": "crc-1",
+      "name": "Foothill Community Resource Center (Demo)",
+      "type": "resource_center",
+      "address": "200 Example Plaza Way, San Jose, CA 95127",
+      "lat": 37.3382,
+      "lng": -121.8224,
+      "offers": ["charging", "ice", "cooling", "water"]
+    }
+  ]
+}

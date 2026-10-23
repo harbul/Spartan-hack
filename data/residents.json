@@ -1,0 +1,30 @@
+{
+  "_meta": {
+    "about": "Synthetic registry of electricity-dependent residents (~40, incl. the 5 hero residents from PLAN.md §3). One example record so far. All data is fictional; phones use 555 numbers.",
+    "plan": "§3 demo scenario, §7 residents table",
+    "owner": "P4 (Story, data and video)",
+    "shape": "backend/app/schemas.py Resident / frontend/src/api/types.ts Resident"
+  },
+  "residents": [
+    {
+      "resident_id": "res-002",
+      "name": "Rosa Delgado",
+      "age": 64,
+      "phone": "+14085550102",
+      "address": "1427 Fictional Ridge Ct, San Jose, CA 95127",
+      "lat": 37.3721,
+      "lng": -121.8083,
+      "language": "es",
+      "devices": ["insulin"],
+      "baseline_backup_hours": 12,
+      "lives_alone": false,
+      "emergency_contact": {
+        "name": "Marco Delgado",
+        "relation": "son",
+        "phone": "+14085550152",
+        "language": "en"
+      },
+      "notes": "Demo data. Keeps insulin pens in the fridge."
+    }
+  ]
+}
