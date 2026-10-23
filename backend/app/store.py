@@ -14,6 +14,7 @@ Owner: P2 (Backend and infra).
 import json
 import os
 import threading
+import time
 import uuid
 from decimal import Decimal
 from pathlib import Path
@@ -242,8 +243,9 @@ def list_traces(limit: int = 50) -> list[Trace]:
 
 
 def add_event(event: Event) -> None:
-    # Sort key "<ts>#<random>" keeps time order and lets events share a timestamp.
-    item = _to_item(event) | {"sk": f"{event.ts}#{uuid.uuid4().hex[:8]}"}
+    # Sort key "<virtual ts>#<real ns><random>": time order, then write order for
+    # events that share a virtual timestamp (e.g. outage start and check-ins).
+    item = _to_item(event) | {"sk": f"{event.ts}#{time.time_ns():016x}{uuid.uuid4().hex[:4]}"}
     _table("EVENTS_TABLE").put_item(Item=item)
 
 

@@ -205,7 +205,7 @@ Resources:
     Properties:
       TableName: !Sub ${AWS::StackName}-events
       BillingMode: PAY_PER_REQUEST
-      # Sort key "<ts>#<random>": many events can share a virtual timestamp.
+      # Sort key "<ts>#<write order>": many events can share a virtual timestamp.
       AttributeDefinitions:
         - { AttributeName: outage_id, AttributeType: S }
         - { AttributeName: sk, AttributeType: S }
