@@ -386,9 +386,13 @@ Spartan-hack/
 │   │   ├── geo.py            ← point-in-polygon (ray casting), nearest resource
 │   │   ├── location.py       ← Amazon Location routes client
 │   │   └── store.py          ← DynamoDB access
+│   ├── data -> ../data       ← symlink: `sam build` ships the seed data
 │   ├── tests/
+│   │   ├── conftest.py       ← in-memory DynamoDB stand-in
 │   │   ├── test_triage.py
 │   │   ├── test_geo.py
+│   │   ├── test_store.py
+│   │   ├── test_seed_data.py
 │   │   └── eval_replies.py   ← runs Job 2 against test_replies.json
 │   ├── pytest.ini
 │   ├── requirements.txt
@@ -397,10 +401,14 @@ Spartan-hack/
 │   └── src/
 │       ├── pages/            ← CommandCenter, Phone, RunSheet
 │       ├── components/
+│       │   ├── status.ts     ← status colors and labels; BedrockBadge.tsx
 │       │   ├── map/          ← IncidentMap (3D), layers/: zone, residents, routes, resources
 │       │   ├── timeline/     ← Timeline, KeyEvents, Counters
 │       │   └── panels/       ← Overview, TriageQueue, ResidentPanel, TraceDrawer, PlanPanel
-│       └── api/types.ts      ← shared contract: TypeScript mirror of schemas.py
+│       └── api/
+│           ├── types.ts      ← shared contract: TypeScript mirror of schemas.py
+│           ├── client.ts     ← fetch helpers + useDashboard()
+│           └── seed.ts       ← data/*.json, typed
 └── infra/
     └── template.yaml         ← SAM: Lambda, HTTP API, tables, bucket, schedule, IAM
 ```
