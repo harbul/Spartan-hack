@@ -359,6 +359,7 @@ Stack: React, Vite, TypeScript, Tailwind, MapLibre GL, and TanStack Query pollin
 Spartan-hack/
 ├── README.md                 ← folder map, ownership, how to run
 ├── .env.example              ← every env var, one line each
+├── amplify.yml               ← Amplify Hosting build for frontend/
 ├── docs/
 │   ├── PLAN.md               ← this file
 │   ├── PROGRESS.md           ← phase status, scope tracker, decisions, open questions
@@ -390,7 +391,8 @@ Spartan-hack/
 │   │   ├── test_geo.py
 │   │   └── eval_replies.py   ← runs Job 2 against test_replies.json
 │   ├── pytest.ini
-│   └── requirements.txt
+│   ├── requirements.txt
+│   └── requirements-dev.txt  ← pytest, httpx, uvicorn (not in the Lambda)
 ├── frontend/
 │   └── src/
 │       ├── pages/            ← CommandCenter, Phone, RunSheet

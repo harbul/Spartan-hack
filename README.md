@@ -10,6 +10,7 @@
 ```
 Spartan-hack/
 ├── .env.example              every env var, one line each (copy to .env)
+├── amplify.yml               Amplify Hosting build for frontend/
 ├── docs/
 │   ├── PLAN.md               the build plan
 │   ├── PROGRESS.md           phase status, scope tracker, decisions, open questions
@@ -37,7 +38,8 @@ Spartan-hack/
 │   │   └── prompts/          one prompt spec per Bedrock job
 │   ├── tests/                pytest unit tests + AI eval script
 │   ├── pytest.ini
-│   └── requirements.txt
+│   ├── requirements.txt      Lambda dependencies
+│   └── requirements-dev.txt  + pytest, httpx, uvicorn (local only)
 ├── frontend/                 React + Vite + TypeScript + Tailwind + MapLibre
 │   └── src/
 │       ├── main.tsx          providers + routes (/, /phone, /run/:runId)
@@ -57,35 +59,54 @@ Spartan-hack/
 |---|---|
 | `frontend/` (incl. `src/api/types.ts`) | P1, Frontend and UX |
 | `backend/app/main.py`, `schemas.py`, `store.py`, `triage.py`, `escalation.py`, `geo.py`, `location.py` | P2, Backend and infra |
-| `backend/tests/test_triage.py`, `test_geo.py`, `backend/requirements.txt`, `infra/`, `.env.example` | P2, Backend and infra |
-| `backend/app/bedrock.py`, `agent.py`, `tools.py`, `prompts/`, `backend/tests/eval_replies.py` | P3, AI |
+| `backend/tests/test_triage.py`, `test_geo.py`, `test_health.py`, `backend/requirements*.txt`, `infra/`, `amplify.yml`, `.env.example` | P2, Backend and infra |
+| `backend/app/bedrock.py`, `agent.py`, `tools.py`, `prompts/`, `backend/tests/eval_replies.py`, `test_bedrock.py` | P3, AI |
 | `data/`, `docs/` | P4, Story, data and video |
 
 The shared contracts (`backend/app/schemas.py` and `frontend/src/api/types.ts`) are agreed by P1, P2 and P3: change both in the same PR. P2 owns merges to `main`, and `main` must always deploy (§12).
 
 ## Run it locally
 
-Placeholder commands until the code exists.
+Needs Python 3.12, Node 22, and (for AWS) the AWS CLI and SAM CLI with credentials for the team account.
 
 ```bash
-# One-time: environment
-cp .env.example .env              # fill in model IDs, keys, table names
+# One-time: environment (repo root)
+cp .env.example .env              # fill in model IDs, API URL, map key (see Deploy below)
 
 # Backend (from backend/)
 python3.12 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-set -a && source ../.env && set +a
-sam local start-api -t ../infra/template.yaml   # or uvicorn, see docs/PROGRESS.md open questions
+pip install -r requirements-dev.txt          # app deps + pytest, httpx, uvicorn
+set -a && source ../.env && set +a           # AWS creds come from your AWS profile / env
+uvicorn app.main:app --reload --port 8000
+curl localhost:8000/health                   # {"ok":true}
+curl localhost:8000/hello-bedrock            # real Bedrock reply (503 if model IDs unset)
 
 # Tests (from backend/)
-pytest                            # unit tests
-python tests/eval_replies.py      # AI eval against data/test_replies.json (calls Bedrock)
+pytest                            # unit tests (Bedrock is stubbed)
+python tests/eval_replies.py      # AI eval against data/test_replies.json (calls Bedrock; from H4)
 
 # Frontend (from frontend/)
 npm install
-npm run dev                       # http://localhost:5173
+npm run dev                       # http://localhost:5173  (/3d-test = throwaway 3D map test)
 npm run build                     # type-check + production build
-
-# Deploy (from infra/)
-sam build && sam deploy --guided
 ```
+
+## Deploy
+
+```bash
+# Backend (from infra/): Lambda + HTTP API + tables + browser map key
+sam build
+sam deploy --guided               # stack name: stillhere, region: us-west-2,
+                                  # BedrockFastModelId / BedrockStrongModelId = inference profile IDs,
+                                  # "ApiFunction has no authentication. Is this okay?" -> y
+                                  # (answers are saved to infra/samconfig.toml, gitignored)
+# Later deploys: sam build && sam deploy
+
+# Values for .env and Amplify, from the stack outputs
+aws cloudformation describe-stacks --stack-name stillhere \
+  --query "Stacks[0].Outputs" --output table          # ApiUrl -> VITE_API_URL
+aws location describe-key --key-name stillhere-maps \
+  --query Key --output text                           # -> VITE_LOCATION_API_KEY
+```
+
+Frontend: Amplify Hosting builds `frontend/` with [`amplify.yml`](amplify.yml). Connect the repo as a monorepo with root `frontend`, set `VITE_API_URL`, `VITE_LOCATION_API_KEY` and `VITE_LOCATION_REGION`, and add the SPA rewrite (`</^[^.]+$|\.(?!(css|gif|ico|jpg|js|mjs|png|txt|svg|woff|woff2|ttf|map|json|webp)$)([^.]+$)/>` → `/index.html`, 200) so `/phone` and `/run/:runId` deep links work.
