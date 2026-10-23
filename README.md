@@ -135,4 +135,18 @@ print(bedrock.assess_reply(minh, sms.output, "Bình oxy còn khoảng 3 tiếng.
 PY
 ```
 
+The H4–H6 golden path through the API, then the AI eval (from `backend/`, needs AWS):
+
+```bash
+OUTAGE=<outage_id from POST /outages>
+curl -X POST $API/outages/$OUTAGE/checkins               # {"sent": 40}: Job 1 for everyone
+curl -X POST $API/inbound -H 'content-type: application/json' \
+  -d '{"phone":"+14085550102","text":"tengo 3 plumas, el refri ya no enfría"}'   # Rosa: Jobs 2 + 3, High
+curl -X POST $API/clock/advance -H 'content-type: application/json' -d '{"minutes":180}'  # Job 4 escalations
+curl $API/dashboard                                       # counts, cases, events at virtual now
+python tests/eval_replies.py                              # needs 18/20 and no privacy hits
+```
+
+Or run it in the browser: `/` → Reset demo → 1. Load outage zone → 2. Send check-ins, then send the hero quick replies from `/phone` and press +3 h. Set `VITE_USE_MOCK=true` to work on the screens without an API.
+
 Frontend: Amplify Hosting builds `frontend/` with [`amplify.yml`](amplify.yml). Connect the repo as a monorepo with root `frontend`, set `VITE_API_URL`, `VITE_LOCATION_API_KEY` and `VITE_LOCATION_REGION`, and add the SPA rewrite (`</^[^.]+$|\.(?!(css|gif|ico|jpg|js|mjs|png|txt|svg|woff|woff2|ttf|map|json|webp)$)([^.]+$)/>` → `/index.html`, 200) so `/phone` and `/run/:runId` deep links work.
