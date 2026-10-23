@@ -17,10 +17,10 @@
 
 - **Current phase:** H8–H12 (SHOULD tier) in progress, built offline. AWS credentials are here (Workshop Studio, `us-east-1` only); the H7–H8 gate now waits on the deploy, and the event account can't create IAM roles (see the AWS entry in the Phase log)
 - **Handoff:** new to the project or picking up a role? Start at **[HANDOFF.md](HANDOFF.md)**: status, the AWS critical path, and remaining work by role
-- **Last updated:** 2026-10-23 21:30 UTC · Claude session
+- **Last updated:** 2026-10-23 21:35 UTC · Claude session
 - **Overall health:** 🟡 MUST golden path and most of SHOULD are code-complete and tested without AWS (117 tests, `npm run build`, live UI against the real API with in-memory tables and stand-in Bedrock and Location). Credentials are here and pre-flighted: Bedrock (Haiku 4.5, Sonnet 4.6) and Amazon Location answer in `us-east-1`. Nothing is deployed yet: the account can't create IAM roles, so the Lambda needs a role from the organizers (`FunctionRoleArn`) or we run the backend locally (`DeployApi=false`), [AWS_SETUP.md §2](AWS_SETUP.md#2-deploy-the-stack)
 - **Gates:**
-  - H0–H1 "Deployed URL returns a Bedrock reply; 3D path chosen" · ⬜ not met (no AWS credentials). 3D path chosen provisionally (Amazon `Terrain3D`)
+  - H0–H1 "Deployed URL returns a Bedrock reply; 3D path chosen" · ⬜ not met: Bedrock answers in the event account, but nothing is deployed (the account can't create IAM roles; [AWS_SETUP.md §2](AWS_SETUP.md#2-deploy-the-stack)). 3D path chosen provisionally (Amazon `Terrain3D`, confirmed in `us-east-1`)
   - H1–H4 "Each part works alone" · 🟡 met with stubs and mocks; real-AWS check pending
   - H4–H6 "Replies flow into the queue and onto the map" · 🟡 met offline: reset → zone → 40 check-ins → 4 phone replies → +3 h ends with Minh Critical, Rosa/Harold High, Denise OK, Lupe silent L3. Real-AWS check pending (README smoke test)
   - H6–H7 "Plan renders" · 🟡 met offline: + Others reply → +3 h → plan (13 stops, 3 volunteers, routes on the map) → approve → route sheet → mark done. Real-AWS check pending (agent on real Bedrock, routes on real Amazon Location)
@@ -44,10 +44,10 @@ Phases and gates from [PLAN.md §13](PLAN.md#13-timeline-18-build-hours). H0 is 
 | Phase | Gate | Status | Finished |
 |---|---|---|---|
 | Pre-event setup | §18 checklist done (see Open questions) | ⚠️ superseded: hacking started with items still open | |
-| H0–H1 | Deployed URL returns a Bedrock reply; 3D path chosen (Amazon or fallback) | 🔄 in progress: code done, deploy blocked on credentials | |
-| H1–H4 | Each part works alone | 🔄 in progress: code done and tested offline; real-AWS check blocked on credentials | |
-| H4–H6 | Replies flow into the queue and onto the map | 🔄 in progress: code done and tested offline; real-AWS check blocked on credentials | |
-| H6–H7 | Plan renders | 🔄 in progress: code done and tested offline; real-AWS check blocked on credentials | |
+| H0–H1 | Deployed URL returns a Bedrock reply; 3D path chosen (Amazon or fallback) | 🔄 in progress: code done, Bedrock answers; deploy waits on the IAM answer (or `DeployApi=false`) | |
+| H1–H4 | Each part works alone | 🔄 in progress: code done and tested offline; real-AWS check waits on the deploy | |
+| H4–H6 | Replies flow into the queue and onto the map | 🔄 in progress: code done and tested offline; real-AWS check waits on the deploy | |
+| H6–H7 | Plan renders | 🔄 in progress: code done and tested offline; real-AWS check waits on the deploy | |
 | H7–H8 | Golden path green, or cut (safety video recorded) | ⬜ not started | |
 | H8–H12 | SHOULD tier done | 🔄 in progress: 3D map, fly-to, pulse, About panel and Guardrails code done offline | |
 | H12–H14 | Green or harden | ⬜ not started | |
@@ -72,7 +72,7 @@ From [PLAN.md §11](PLAN.md#11-scope-tiers). Tick items as they are finished.
 - [ ] Timeline bar (forward only: play and jump buttons, counters, event markers) plus escalation L1 to L3 (Job 4) (done; real-Bedrock check pending)
 - [ ] Job 5: agent plan → routes on the map → Approve → volunteer view (done; real Bedrock + Location check pending)
 - [ ] AI Trace drawer (list done; step-by-step detail in H8–H12)
-- [ ] Deployed: Amplify URL plus the SAM stack (template ready; blocked on credentials)
+- [ ] Deployed: Amplify URL plus the SAM stack (template ready with three deploy modes; waits on the organizers' IAM answer)
 
 ### SHOULD: H8 to H12
 
