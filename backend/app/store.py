@@ -112,6 +112,12 @@ def _clear(table) -> None:
             batch.delete_item(Key={k: item[k] for k in keys})
 
 
+def _s3():
+    if not hasattr(_local, "s3"):
+        _local.s3 = boto3.session.Session().client("s3", region_name=os.environ.get("AWS_REGION") or None)
+    return _local.s3
+
+
 # --- seed data (data/*.json) --------------------------------------------------
 
 
@@ -151,6 +157,20 @@ def list_residents() -> list[Resident]:
     return [Resident.model_validate(_plain(i)) for i in _scan_all(_table("RESIDENTS_TABLE"))]
 
 
+def get_resident(resident_id: str) -> Resident | None:
+    item = _table("RESIDENTS_TABLE").get_item(Key={"resident_id": resident_id}).get("Item")
+    return Resident.model_validate(_plain(item)) if item else None
+
+
+def find_resident_by_phone(phone: str) -> Resident | None:
+    """Match on the last 10 digits, so "+1 (408) 555-0101" finds "+14085550101"."""
+    digits = "".join(c for c in phone if c.isdigit())[-10:]
+    return next(
+        (r for r in list_residents() if "".join(c for c in r.phone if c.isdigit())[-10:] == digits),
+        None,
+    )
+
+
 # --- outages and cases ----------------------------------------------------------
 
 
@@ -163,6 +183,13 @@ def get_outage(outage_id: str) -> Outage | None:
     return Outage.model_validate(_plain(item)) if item else None
 
 
+def get_active_outage() -> Outage | None:
+    """The newest outage with status "active" (the demo runs one at a time)."""
+    active = [i for i in _scan_all(_table("OUTAGES_TABLE")) if i.get("status") == "active"]
+    newest = max(active, key=lambda i: i["starts_at"], default=None)
+    return Outage.model_validate(_plain(newest)) if newest else None
+
+
 def put_case(case: Case) -> None:
     _table("CASES_TABLE").put_item(Item=_to_item(case))
 
@@ -171,6 +198,11 @@ def put_cases(cases: list[Case]) -> None:
     with _table("CASES_TABLE").batch_writer() as batch:
         for case in cases:
             batch.put_item(Item=_to_item(case))
+
+
+def get_case(outage_id: str, resident_id: str) -> Case | None:
+    item = _table("CASES_TABLE").get_item(Key={"outage_id": outage_id, "resident_id": resident_id}).get("Item")
+    return Case.model_validate(_plain(item)) if item else None
 
 
 def list_cases(outage_id: str) -> list[Case]:
@@ -218,6 +250,16 @@ def add_event(event: Event) -> None:
 def list_events(outage_id: str) -> list[Event]:
     items = _query_all(_table("EVENTS_TABLE"), "outage_id", outage_id)
     return [Event.model_validate(_plain(i)) for i in items]
+
+
+# --- reply photos (S3) ----------------------------------------------------------------
+
+
+def put_photo(key: str, data: bytes, content_type: str) -> None:
+    bucket = os.environ.get("PHOTOS_BUCKET", "").strip()
+    if not bucket:
+        raise StoreNotConfigured("PHOTOS_BUCKET is not set (see .env.example)")
+    _s3().put_object(Bucket=bucket, Key=key, Body=data, ContentType=content_type)
 
 
 # --- config -----------------------------------------------------------------------

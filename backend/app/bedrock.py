@@ -265,7 +265,7 @@ def _tool_input(result: ConverseResult, name: str) -> dict[str, Any]:
     raise ValueError(f"model did not call {name} (stop reason: {result.stop_reason})")
 
 
-def _image_format(data: bytes) -> str:
+def image_format(data: bytes) -> str:
     if data.startswith(b"\x89PNG"):
         return "png"
     if data[:3] == b"GIF":
@@ -329,7 +329,7 @@ def assess_reply(
     }
     content: list[dict[str, Any]] = [{"text": json.dumps(facts, ensure_ascii=False)}]
     if image_bytes:
-        content.append({"image": {"format": _image_format(image_bytes), "source": {"bytes": image_bytes}}})
+        content.append({"image": {"format": image_format(image_bytes), "source": {"bytes": image_bytes}}})
     result = converse(
         "assess",
         load_prompt("assess"),

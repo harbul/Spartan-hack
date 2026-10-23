@@ -112,15 +112,18 @@ def rescore_case(
     case: Case, resident: Resident, outage: Outage, at: datetime, *, explain: bool | None = None, track: bool = True
 ) -> Event | None:
     """Recompute the score at `at`. Job 3 writes the "why" when `explain` is True,
-    or when it is None and the band changed. Returns a `band_change` event if one
-    was written (`track` False skips it, e.g. for the first score at check-in)."""
+    or when it is None and the band changed or an escalated case has no "why" yet
+    (a resident can be Critical from check-in and never change band). Returns a
+    `band_change` event if one was written (`track` False skips it, e.g. for the
+    first score at check-in)."""
     breakdown, _ = triage.score_case(resident, case, outage, at)
     before = case.band
     case.priority = breakdown.total
     case.score_breakdown = breakdown
     case.band = triage.band(breakdown.total)
     changed = case.band != before
-    if explain or (explain is None and changed):
+    unexplained_escalation = case.rationale is None and case.status in ("escalated", "silent")
+    if explain or (explain is None and (changed or unexplained_escalation)):
         case.rationale = bedrock.explain_priority(breakdown, case.assessment, resident).output
     store.put_case(case)
     if not (track and changed):

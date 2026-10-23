@@ -7,15 +7,17 @@ Implements: PLAN.md §8 (API contract), §6 (Lambda + Mangum).
 Owner: P2 (Backend and infra).
 """
 
+import base64
+import binascii
 import uuid
 
 from botocore.exceptions import BotoCoreError, ClientError
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from mangum import Mangum
 
-from app import bedrock, geo, store
+from app import bedrock, escalation, geo, store, triage
 from app.schemas import (
     Case,
     CaseResponse,
@@ -24,15 +26,20 @@ from app.schemas import (
     ClockAdvanceResponse,
     CreateOutageRequest,
     CreateOutageResponse,
+    Counts,
     CreatePlanRequest,
+    DashboardCase,
     DashboardResponse,
     Event,
     InboundRequest,
+    Message,
     MessagesResponse,
     Outage,
     PlanResponse,
+    Resource,
     RunResponse,
     TracesResponse,
+    Volunteer,
 )
 
 app = FastAPI(title="StillHere API")
@@ -148,19 +155,103 @@ def create_outage(body: CreateOutageRequest) -> CreateOutageResponse:
 @app.post("/outages/{outage_id}/checkins")
 def send_checkins(outage_id: str) -> CheckinsResponse:
     """Job 1 in parallel for every affected resident; cases move to awaiting_reply."""
-    ...
+    outage = _outage(outage_id)
+    residents = {r.resident_id: r for r in store.list_residents()}
+    cases = [c for c in store.list_cases(outage_id) if c.status == "not_contacted"]
+    drafts = bedrock.write_checkins([residents[c.resident_id] for c in cases], outage)
+    at = escalation.now()
+    ts = escalation.iso(at)
+    for case in cases:
+        draft = drafts[case.resident_id]
+        store.add_message(
+            Message(
+                resident_id=case.resident_id,
+                ts=ts,
+                direction="out",
+                channel="sms",
+                text=draft.output,
+                trace_id=draft.trace_id,
+            )
+        )
+        case.status = "awaiting_reply"
+        case.last_outbound_at = ts
+        # First score from the profile alone; no "why" or band events yet (40 Bedrock calls saved).
+        escalation.rescore_case(case, residents[case.resident_id], outage, at, explain=False, track=False)
+    if cases:
+        store.add_event(
+            Event(outage_id=outage_id, ts=ts, type="checkins_sent", label=f"Check-ins sent to {len(cases)} residents")
+        )
+    return CheckinsResponse(sent=len(cases))
 
 
 @app.post("/inbound")
 def inbound(body: InboundRequest) -> CaseResponse:
     """Same webhook shape AWS End User Messaging would call. Jobs 2 and 3, then rescore."""
-    ...
+    resident = store.find_resident_by_phone(body.phone)
+    if not resident:
+        raise HTTPException(status_code=404, detail="Unknown phone number")
+    outage = store.get_active_outage()
+    case = store.get_case(outage.outage_id, resident.resident_id) if outage else None
+    if not outage or not case:
+        raise HTTPException(status_code=404, detail=f"{resident.name} is not in an active outage")
+
+    at = escalation.now()
+    ts = escalation.iso(at)
+    image = _decode_image(body.image_b64)
+    image_key = None
+    if image:
+        fmt = bedrock.image_format(image)
+        image_key = f"replies/{resident.resident_id}/{ts}.{fmt}"
+        store.put_photo(image_key, image, f"image/{fmt}")
+
+    sent = [m for m in store.list_messages(resident.resident_id) if m.direction == "out" and m.channel == "sms"]
+    assessed = bedrock.assess_reply(resident, sent[-1].text if sent else "", body.text, image)
+    a = assessed.output
+    store.add_message(
+        Message(
+            resident_id=resident.resident_id,
+            ts=ts,
+            direction="in",
+            channel="sms",
+            text=body.text,
+            translation_en=None if a.detected_language == "en" else a.english_translation,
+            image_key=image_key,
+            trace_id=assessed.trace_id,
+        )
+    )
+
+    before = case.status
+    case.assessment = a
+    case.last_inbound_at = ts
+    case.needs_review = a.confidence < triage.REVIEW_CONFIDENCE
+    if before not in ("dispatched", "resolved"):
+        # "unclear" still means a person answered: someone should look, not escalate.
+        case.status = "ok" if a.status == "ok" else "needs_help"
+    store.add_event(
+        Event(
+            outage_id=outage.outage_id,
+            ts=ts,
+            type="reply",
+            label=f"{resident.name} replied",
+            resident_id=resident.resident_id,
+            from_status=before,
+            to_status=case.status,
+        )
+    )
+    escalation.rescore_case(case, resident, outage, at, explain=True)
+    return CaseResponse(case=case)
 
 
 @app.post("/clock/advance")
 def advance_clock(body: ClockAdvanceRequest) -> ClockAdvanceResponse:
     """Move virtual time forward and run the escalation check now (Job 4)."""
-    ...
+    try:
+        at = escalation.advance(body.minutes)
+    except ValueError as err:
+        raise HTTPException(status_code=422, detail=str(err)) from err
+    outage = store.get_active_outage()
+    escalations = _tick(outage.outage_id) if outage else []
+    return ClockAdvanceResponse(now=escalation.iso(at), escalations=escalations)
 
 
 @app.post("/plans")
@@ -182,19 +273,42 @@ def mark_stop_done(run_id: str, resident_id: str) -> CaseResponse:
 
 
 @app.get("/dashboard")
-def dashboard(outage_id: str) -> DashboardResponse:
-    """Everything the command center polls every 3 s, at virtual now."""
-    ...
+def dashboard(outage_id: str | None = None) -> DashboardResponse:
+    """Everything the command center polls every 3 s, at virtual now.
+
+    `outage_id` is optional: without it, the active outage (the demo runs one).
+    """
+    at = escalation.now()
+    outage = store.get_outage(outage_id) if outage_id else store.get_active_outage()
+    resources = [Resource.model_validate(r) for r in store.get_config("resources") or []]
+    volunteers = [Volunteer.model_validate(v) for v in store.get_config("volunteers") or []]
+    cases: list[DashboardCase] = []
+    if outage:
+        residents = {r.resident_id: r for r in store.list_residents()}
+        for case in store.list_cases(outage.outage_id):
+            resident = residents[case.resident_id]
+            _, backup = triage.score_case(resident, case, outage, at)
+            cases.append(DashboardCase(**case.model_dump(), resident=resident, backup_hours_left=backup))
+    return DashboardResponse(
+        now=escalation.iso(at),
+        outage=outage,
+        counts=_counts(cases),
+        cases=cases,
+        events=store.list_events(outage.outage_id) if outage else [],
+        plan=None,  # TODO(P2, H6-H7): the outage's latest plan
+        resources=resources,
+        volunteers=volunteers,
+    )
 
 
 @app.get("/residents/{resident_id}/messages")
 def resident_messages(resident_id: str) -> MessagesResponse:
-    ...
+    return MessagesResponse(messages=store.list_messages(resident_id))
 
 
 @app.get("/traces")
 def list_traces(limit: int = 50) -> TracesResponse:
-    ...
+    return TracesResponse(traces=store.list_traces(min(max(limit, 1), 200)))
 
 
 @app.get("/runs/{run_id}")
@@ -203,13 +317,55 @@ def get_run(run_id: str) -> RunResponse:
     ...
 
 
+# --- helpers ------------------------------------------------------------------
+
+
+def _outage(outage_id: str) -> Outage:
+    outage = store.get_outage(outage_id)
+    if not outage:
+        raise HTTPException(status_code=404, detail=f"No outage {outage_id}")
+    return outage
+
+
+def _decode_image(image_b64: str | None) -> bytes | None:
+    """Base64 photo from the phone simulator; a data-URL prefix is allowed."""
+    if not image_b64:
+        return None
+    try:
+        return base64.b64decode(image_b64.split(",", 1)[-1], validate=True)
+    except (binascii.Error, ValueError) as err:
+        raise HTTPException(status_code=422, detail="image_b64 is not valid base64") from err
+
+
+def _counts(cases: list[Case]) -> Counts:
+    """Same rule as the frontend's categoryOf (frontend/src/components/status.ts)."""
+    open_help = [c for c in cases if c.status in ("needs_help", "dispatched")]
+    return Counts(
+        safe=sum(c.status in ("ok", "resolved") for c in cases),
+        needs_help=sum(c.band != "Critical" for c in open_help),
+        critical=sum(c.band == "Critical" for c in open_help),
+        no_reply=sum(c.status in ("awaiting_reply", "escalated", "silent") for c in cases),
+    )
+
+
+def _tick(outage_id: str):
+    """What time passing does: escalate silent cases, then rescore everyone."""
+    escalations = escalation.run_escalation_check(outage_id)
+    escalation.rescore_open_cases(outage_id)
+    return escalations
+
+
+SCHEDULED_EVENT = {"stillhere": "escalation_check"}  # the Input of the 1-minute schedule
+
 _asgi_handler = Mangum(app)
 
 
 def handler(event, context):
     """Lambda entry point (infra/template.yaml: app.main.handler).
 
-    TODO(P2, §5): send EventBridge Scheduler events to
-    escalation.run_escalation_check; everything else goes to Mangum.
+    The EventBridge schedule runs the escalation check; everything else goes to Mangum.
     """
+    if isinstance(event, dict) and event.get("stillhere") == SCHEDULED_EVENT["stillhere"]:
+        outage = store.get_active_outage()
+        return {"escalations": len(_tick(outage.outage_id)) if outage else 0}
     return _asgi_handler(event, context)

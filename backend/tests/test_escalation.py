@@ -118,3 +118,13 @@ def test_clock_only_moves_forward(tables):
     assert store.get_config("clock_offset_min") == 90
     with pytest.raises(ValueError):
         escalation.advance(0)
+
+
+def test_escalated_case_gets_a_why_even_without_a_band_change(world):
+    lupe = case("res-005")
+    lupe.band, lupe.priority = "Critical", 80  # already Critical from her profile at check-in
+    store.put_case(lupe)
+    at(world, 50)
+    escalation.run_escalation_check("out-1")
+    escalation.rescore_open_cases("out-1")
+    assert case("res-005").band == "Critical" and case("res-005").rationale
