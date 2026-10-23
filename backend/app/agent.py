@@ -7,12 +7,17 @@ Implements: PLAN.md §4 Job 5, §16 (greedy fallback planner).
 Owner: P3 (AI).
 """
 
+import logging
+import time
 from typing import Any
 
-from app import geo, tools
+from app import bedrock, geo, tools
 from app.schemas import Plan
 
+log = logging.getLogger(__name__)
 MAX_TURNS = 12
+TIME_BUDGET_S = 20  # leaves room under the 30 s API limit for the greedy fallback (§17)
+START = "Plan the volunteer runs for the open cases in this outage."
 
 ITEMS = {
     "cooler": ["cooler", "ice packs"],
@@ -23,8 +28,57 @@ ITEMS = {
 
 
 def plan_dispatch(outage_id: str) -> Plan:
-    """Run the tool-use loop with prompts/planner.md and tools.AGENT_TOOLS until submit_plan."""
-    ...
+    """Run the tool-use loop with prompts/planner.md and tools.AGENT_TOOLS until submit_plan.
+
+    Every turn is a converse() call, so each one is a row in the AI Trace drawer.
+    Falls back to greedy_plan() on the turn limit, the time budget or an error;
+    the plan summary says so. A missing model ID is a setup error and is raised.
+    """
+    started = time.monotonic()
+    messages: list[dict[str, Any]] = [{"role": "user", "content": [{"text": START}]}]
+    first_trace = None
+    try:
+        for _ in range(MAX_TURNS):
+            if time.monotonic() - started > TIME_BUDGET_S:
+                return greedy_plan(outage_id, f"time budget of {TIME_BUDGET_S} s reached")
+            result = bedrock.converse(
+                "planner",
+                bedrock.load_prompt("planner"),
+                messages,
+                strong=True,
+                tools=tools.AGENT_TOOLS,
+                max_tokens=2000,
+                temperature=0,
+            )
+            first_trace = first_trace or result.trace_id
+            content = result.raw["output"]["message"]["content"]
+            messages.append({"role": "assistant", "content": content})
+            uses = [block["toolUse"] for block in content if "toolUse" in block]
+            if not uses:
+                messages.append({"role": "user", "content": [{"text": "Call submit_plan with the runs."}]})
+                continue
+            results = []
+            for use in uses:
+                output = tools.run_tool(use["name"], use.get("input") or {}, outage_id)
+                if isinstance(output, Plan):
+                    output.trace_id = first_trace
+                    return output
+                results.append(
+                    {
+                        "toolResult": {
+                            "toolUseId": use["toolUseId"],
+                            "content": [{"json": output}],
+                            "status": "error" if "error" in output else "success",
+                        }
+                    }
+                )
+            messages.append({"role": "user", "content": results})
+        return greedy_plan(outage_id, f"no plan after {MAX_TURNS} turns")
+    except bedrock.BedrockNotConfigured:
+        raise
+    except Exception as err:  # noqa: BLE001  (any agent failure must still leave Dana a plan)
+        log.warning("planner agent failed, using the greedy plan: %s", err)
+        return greedy_plan(outage_id, f"error: {type(err).__name__}")
 
 
 def _action(case: dict[str, Any]) -> str:
