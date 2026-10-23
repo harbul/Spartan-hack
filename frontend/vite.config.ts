@@ -1,6 +1,7 @@
 /**
  * Vite config: React + Tailwind plugins. Reads env from the repo root .env
- * (see /.env.example) so the whole team shares one file.
+ * (see /.env.example) so the whole team shares one file. The dev server may
+ * read ../data so the app can import the seed JSON (phone quick replies, mock).
  *
  * Implements: PLAN.md §9 (frontend stack). Owner: P1 (Frontend and UX).
  */
@@ -11,4 +12,5 @@ import { defineConfig } from 'vite';
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   envDir: '..',
+  server: { fs: { allow: ['..'] } },
 });
