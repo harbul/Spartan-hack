@@ -21,7 +21,7 @@ from app.schemas import Case, Device, Escalation, Event, Message, Outage, Reside
 
 LADDER_MINUTES = {1: 30, 2: 60, 3: 90}
 STATUS_AT_LEVEL = {1: "awaiting_reply", 2: "escalated", 3: "silent"}
-CHANNEL_AT_LEVEL = {1: "sms", 2: "contact", 3: "door"}
+CHANNEL_AT_LEVEL = bedrock.CHANNELS
 WHAT_AT_LEVEL = {1: "re-ping sent", 2: "emergency contact messaged", 3: "door-knock added"}
 ESCALATING = {"awaiting_reply", "escalated"}
 WORKERS = 8  # parallel residents per check; keeps a +3 h jump under the 30 s API limit
@@ -121,7 +121,7 @@ def rescore_case(
     case.band = triage.band(breakdown.total)
     changed = case.band != before
     if explain or (explain is None and changed):
-        case.rationale = bedrock.explain_priority(breakdown, case.assessment).output
+        case.rationale = bedrock.explain_priority(breakdown, case.assessment, resident).output
     store.put_case(case)
     if not (track and changed):
         return None

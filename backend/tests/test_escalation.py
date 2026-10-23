@@ -35,7 +35,7 @@ def world(tables, monkeypatch):
         channel = escalation.CHANNEL_AT_LEVEL[level]
         return bedrock.JobResult(Escalation(resident_id=resident.resident_id, level=level, channel=channel, text=f"L{level}"), "tr")
 
-    def fake_explain(breakdown, assessment):
+    def fake_explain(breakdown, assessment, resident):
         explains.append(breakdown.total)
         return bedrock.JobResult(f"why {breakdown.total}", "tr")
 
