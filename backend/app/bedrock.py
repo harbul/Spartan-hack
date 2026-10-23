@@ -48,6 +48,15 @@ PROMPTS_DIR = Path(__file__).parent / "prompts"
 FAST_MODEL_ENV = "BEDROCK_FAST_MODEL_ID"
 STRONG_MODEL_ENV = "BEDROCK_STRONG_MODEL_ID"
 
+# Job 6, Guardrails (§4). Two guardrails, both optional until H0 (unset = skipped):
+#   advice  denied topic "medical advice": on every resident-facing SMS (Jobs 1, 4) and to screen replies
+#   pii     names, addresses, phones anonymized: only for trace rows, through ApplyGuardrail
+# One guardrail can't do both: PII filters on the SMS jobs would also mask "Hi Rosa".
+GUARDRAIL_ENV = "BEDROCK_GUARDRAIL_ID"
+GUARDRAIL_VERSION_ENV = "BEDROCK_GUARDRAIL_VERSION"
+PII_GUARDRAIL_ENV = "BEDROCK_PII_GUARDRAIL_ID"
+PII_GUARDRAIL_VERSION_ENV = "BEDROCK_PII_GUARDRAIL_VERSION"
+
 
 class BedrockNotConfigured(RuntimeError):
     """A model ID env var is missing. Set it in .env (local) or the SAM parameters (Lambda)."""
@@ -65,6 +74,11 @@ class ConverseResult:
     stop_reason: str  # "end_turn", "tool_use", "max_tokens", ...
     raw: dict[str, Any] = field(repr=False)  # full Converse response, for tool-use callers (Jobs 2, 5)
     trace_id: str | None = None  # None if the trace row couldn't be written
+    guardrail_action: str | None = None  # "NONE" or "INTERVENED" when the advice guardrail ran; None if it didn't
+
+    @property
+    def blocked(self) -> bool:
+        return self.guardrail_action == "INTERVENED"
 
 
 @dataclass
@@ -92,6 +106,14 @@ def model_id(strong: bool = False) -> str:
     if not value:
         raise BedrockNotConfigured(f"{name} is not set (see .env.example, PLAN.md §4)")
     return value
+
+
+def guardrail_config(id_env: str, version_env: str) -> tuple[str, str] | None:
+    """(id, version) of a configured guardrail, or None while it isn't set up (offline, before H0)."""
+    guardrail_id = os.environ.get(id_env, "").strip()
+    if not guardrail_id:
+        return None
+    return guardrail_id, os.environ.get(version_env, "").strip() or "DRAFT"
 
 
 def load_prompt(name: str) -> str:
@@ -122,11 +144,8 @@ def converse(
 
     `job` names the caller (schemas.BedrockJob) and labels its trace row.
     Other names (the skeleton "hello") are not traced.
+    `guardrail` runs the advice guardrail on the call, when one is configured.
     """
-    if guardrail:
-        # TODO(P3, §4 Job 6): add guardrailConfig (BEDROCK_GUARDRAIL_ID / _VERSION) here.
-        raise NotImplementedError("Guardrails are not wired yet (PLAN.md §4 Job 6)")
-
     mid = model_id(strong)
     request: dict[str, Any] = {
         "modelId": mid,
@@ -139,6 +158,9 @@ def converse(
         request["toolConfig"] = {"tools": tools}
         if tool_choice:
             request["toolConfig"]["toolChoice"] = tool_choice
+    advice = guardrail_config(GUARDRAIL_ENV, GUARDRAIL_VERSION_ENV) if guardrail else None
+    if advice:
+        request["guardrailConfig"] = {"guardrailIdentifier": advice[0], "guardrailVersion": advice[1], "trace": "enabled"}
 
     # TODO(P3, §16): retry once on BEDROCK_FALLBACK_MODEL_ID if this model is denied.
     started = time.perf_counter()
@@ -156,6 +178,8 @@ def converse(
         stop_reason=response.get("stopReason", ""),
         raw=response,
     )
+    if advice:
+        result.guardrail_action = "INTERVENED" if result.stop_reason == "guardrail_intervened" else "NONE"
     result.trace_id = _record_trace(job, system, messages, result)
     return result
 
@@ -183,7 +207,7 @@ def _record_trace(
         latency_ms=result.latency_ms,
         input_tokens=result.input_tokens,
         output_tokens=result.output_tokens,
-        guardrail_action=None,  # TODO(P3, §4 Job 6): from the response's guardrail trace
+        guardrail_action=result.guardrail_action,
     )
     try:
         store.put_trace(trace)
@@ -213,11 +237,61 @@ _PHONE = re.compile(r"(?<!\w)(?:\+?1[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}
 
 
 def mask_pii(text: str) -> str:
-    """Mask PII before storing traces. Phone numbers only for now.
-
-    TODO(P3, §4 Job 6): names and addresses with ApplyGuardrail (BEDROCK_GUARDRAIL_ID).
-    """
+    """Mask PII before storing traces: names, addresses and phones with the PII guardrail
+    (ApplyGuardrail) when it is configured, then phone numbers by pattern either way."""
+    pii = guardrail_config(PII_GUARDRAIL_ENV, PII_GUARDRAIL_VERSION_ENV)
+    if pii:
+        try:
+            response = _client().apply_guardrail(
+                guardrailIdentifier=pii[0], guardrailVersion=pii[1], source="OUTPUT", content=[{"text": {"text": text}}]
+            )
+            if response.get("action") == "GUARDRAIL_INTERVENED" and response.get("outputs"):
+                text = "".join(o.get("text", "") for o in response["outputs"])
+        except Exception as err:  # noqa: BLE001  (masking falls back to the pattern; the trace still gets written)
+            log.warning("PII guardrail failed, masking phones only: %s", err)
     return _PHONE.sub("[phone]", text)
+
+
+def screen_reply(text: str) -> JobResult[bool] | None:
+    """Check a resident's reply against the advice guardrail (ApplyGuardrail, source INPUT).
+
+    True means it asks for medical advice (dosing, skipping treatment, equipment settings):
+    the app never answers that, so the case goes to a person (needs_review). Job 2 still
+    assesses the reply. None while no guardrail is configured. Traced as job "guardrail".
+    """
+    advice = guardrail_config(GUARDRAIL_ENV, GUARDRAIL_VERSION_ENV)
+    if not advice:
+        return None
+    started = time.perf_counter()
+    response = _client().apply_guardrail(
+        guardrailIdentifier=advice[0], guardrailVersion=advice[1], source="INPUT", content=[{"text": {"text": text}}]
+    )
+    latency_ms = round((time.perf_counter() - started) * 1000)
+    intervened = response.get("action") == "GUARDRAIL_INTERVENED"
+    topics = [
+        topic["name"]
+        for assessment in response.get("assessments", [])
+        for topic in assessment.get("topicPolicy", {}).get("topics", [])
+    ]
+    trace = Trace(
+        trace_id=uuid.uuid4().hex,
+        ts=utc_now_iso(),
+        job="guardrail",
+        model_id=f"guardrail:{advice[0]}:{advice[1]}",
+        input_masked=mask_pii(text),
+        output={"blocked_topics": topics} if intervened else "No denied topic",
+        latency_ms=latency_ms,
+        input_tokens=0,
+        output_tokens=0,
+        guardrail_action="INTERVENED" if intervened else "NONE",
+    )
+    try:
+        store.put_trace(trace)
+        trace_id: str | None = trace.trace_id
+    except Exception as err:  # noqa: BLE001  (same as converse traces: best effort)
+        log.warning("guardrail trace not written: %s", err)
+        trace_id = None
+    return JobResult(intervened, trace_id)
 
 
 def utc_now_iso() -> str:
@@ -277,6 +351,36 @@ def image_format(data: bytes) -> str:
 
 # --- Job 1: check-in writer (fast model, parallel, ~10 threads) -------------
 
+# Fixed texts if the advice guardrail blocks a drafted SMS: the resident still gets a safe message.
+SAFE_CHECKIN = {
+    "en": "Hi {first_name}, this is Santa Clara County. Power in your area is off from {power_off} until about "
+    "{power_back_estimate}. How many hours can your {depends_on} last without power? Reply 1 if you're OK, 2 if you need help.",
+    "es": "Hola {first_name}, le escribe el Condado de Santa Clara. La luz en su zona se corta de {power_off} hasta "
+    "aproximadamente {power_back_estimate}. ¿Cuántas horas puede durar su {depends_on} sin luz? Responda 1 si está bien, "
+    "2 si necesita ayuda.",
+    "vi": "Chào {first_name}, đây là Quận Santa Clara. Khu vực của bạn mất điện từ {power_off} đến khoảng "
+    "{power_back_estimate}. Khi không có điện, {depends_on} của bạn dùng được bao nhiêu giờ? Trả lời 1 nếu ổn, 2 nếu cần giúp.",
+}
+# depends_on() is "medicine" or "equipment"; the fixed texts need it in the resident's language.
+DEPENDS_ON_WORD = {
+    "en": {"medicine": "medicine", "equipment": "equipment"},
+    "es": {"medicine": "medicina", "equipment": "equipo"},
+    "vi": {"medicine": "thuốc", "equipment": "thiết bị"},
+}
+SAFE_REPING = {
+    "en": "Hi {first_name}, Santa Clara County checking on you during the power outage. Please reply 1 if you're OK or 2 if you need help.",
+    "es": "Hola {first_name}, el Condado de Santa Clara quiere saber cómo está durante el apagón. Responda 1 si está bien o 2 si necesita ayuda.",
+    "vi": "Chào {first_name}, Quận Santa Clara hỏi thăm bạn trong lúc mất điện. Trả lời 1 nếu ổn hoặc 2 nếu cần giúp.",
+}
+SAFE_CONTACT = {
+    "en": "Hi {contact_first_name}, Santa Clara County here. We have not heard from {resident_first_name} since "
+    "{silent_since} during the power outage. If you can, please check on them or call us.",
+    "es": "Hola {contact_first_name}, le escribe el Condado de Santa Clara. No sabemos de {resident_first_name} desde "
+    "las {silent_since} durante el apagón. Si puede, por favor vea cómo está o llámenos.",
+    "vi": "Chào {contact_first_name}, đây là Quận Santa Clara. Chúng tôi chưa nghe tin từ {resident_first_name} từ "
+    "{silent_since} trong lúc mất điện. Nếu được, xin hãy kiểm tra hoặc gọi cho chúng tôi.",
+}
+
 
 def write_checkin(resident: Resident, outage: Outage) -> JobResult[str]:
     """SMS of 300 chars or less in the resident's language. Never names a device or diagnosis.
@@ -296,8 +400,14 @@ def write_checkin(resident: Resident, outage: Outage) -> JobResult[str]:
         [{"role": "user", "content": [{"text": json.dumps(facts, ensure_ascii=False)}]}],
         max_tokens=300,
         temperature=0.3,
+        guardrail=True,
     )
-    return JobResult(with_stop_line(result.text), result.trace_id)
+    if result.blocked:
+        word = DEPENDS_ON_WORD[resident.language][facts["depends_on"]]
+        text = SAFE_CHECKIN[resident.language].format(**{**facts, "depends_on": word})
+    else:
+        text = result.text
+    return JobResult(with_stop_line(text), result.trace_id)
 
 
 def write_checkins(
@@ -437,7 +547,12 @@ def draft_escalation(resident: Resident, case: Case, level: int) -> JobResult[Es
         [{"role": "user", "content": [{"text": json.dumps(facts, ensure_ascii=False)}]}],
         max_tokens=300,
         temperature=0.3,
+        guardrail=level < 3,  # L1 and L2 are SMS; L3 is a note for our own volunteer
     )
-    text = with_stop_line(result.text) if level < 3 else result.text.strip()
+    text = result.text
+    if result.blocked and level < 3:
+        language = resident.language if level == 1 else contact.language
+        text = (SAFE_REPING if level == 1 else SAFE_CONTACT)[language].format(**facts)
+    text = with_stop_line(text) if level < 3 else text.strip()
     escalation = Escalation(resident_id=resident.resident_id, level=level, channel=CHANNELS[level], text=text)
     return JobResult(escalation, result.trace_id)

@@ -15,6 +15,7 @@ import { useState } from 'react';
 import { USE_MOCK, apiGet, useDashboard, useMessages, useTraces } from '../api/client';
 import BedrockBadge from '../components/BedrockBadge';
 import IncidentMap from '../components/map/IncidentMap';
+import AboutPanel from '../components/panels/AboutPanel';
 import Overview from '../components/panels/Overview';
 import PlanPanel from '../components/panels/PlanPanel';
 import ResidentPanel from '../components/panels/ResidentPanel';
@@ -34,6 +35,7 @@ export default function CommandCenter() {
   const { data, error, busy, advance, reset, loadZone, sendCheckins, planDispatch, approvePlan } = useDashboard();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>('resident');
+  const [aboutOpen, setAboutOpen] = useState(false);
   const messages = useMessages(selectedId, data);
   const traces = useTraces();
 
@@ -79,10 +81,11 @@ export default function CommandCenter() {
         <button onClick={reset} disabled={!!busy} className="ml-auto rounded border border-stone-400 px-3 py-1 text-sm">
           Reset demo
         </button>
-        <button className="rounded px-2 py-1 text-sm text-stone-600" title="About StillHere (H8-H12)" disabled>
+        <button onClick={() => setAboutOpen(true)} className="rounded px-2 py-1 text-sm text-stone-600 hover:bg-stone-200">
           About
         </button>
       </header>
+      {aboutOpen && <AboutPanel onClose={() => setAboutOpen(false)} />}
       {error && <ApiError error={error} />}
 
       <div className="grid min-h-0 flex-1 grid-cols-[340px_1fr_380px]">

@@ -16,6 +16,7 @@ const JOB_LABEL: Record<BedrockJob, string> = {
   explain: 'Job 3 · Triage explainer',
   escalate: 'Job 4 · Escalation drafter',
   planner: 'Job 5 · Dispatch planner',
+  guardrail: 'Job 6 · Guardrail: reply screening',
 };
 
 export default function TraceDrawer({ traces }: { traces: Trace[] }) {
@@ -28,7 +29,7 @@ export default function TraceDrawer({ traces }: { traces: Trace[] }) {
       </p>
     );
   }
-  // TODO(P1, H8-H12): step-by-step tool calls for the Job 5 agent, guardrail actions.
+  // TODO(P1, H8-H12): step-by-step tool calls for the Job 5 agent.
   return (
     <ul className="divide-y divide-stone-200 text-sm">
       {traces.map((t) => (
@@ -42,6 +43,11 @@ export default function TraceDrawer({ traces }: { traces: Trace[] }) {
             <div className="mt-0.5 text-xs text-stone-500">
               {t.model_id} · {t.latency_ms} ms · {t.input_tokens} in / {t.output_tokens} out tokens
               {t.tool_calls.length > 0 && ` · tool: ${t.tool_calls.map((c) => c.name).join(', ')}`}
+              {t.guardrail_action && (
+                <span className={t.guardrail_action === 'INTERVENED' ? 'font-semibold text-red-700' : ''}>
+                  {' '}· Guardrail: {t.guardrail_action === 'INTERVENED' ? 'blocked' : 'passed'}
+                </span>
+              )}
             </div>
           </button>
           {open === t.trace_id && (

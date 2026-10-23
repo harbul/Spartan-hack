@@ -46,7 +46,7 @@ export type EventType =
   | 'stop_done';
 export type ResourceType = 'resource_center' | 'pharmacy';
 export type StopAction = 'cooler' | 'battery' | 'door_knock' | 'ride';
-export type BedrockJob = 'checkin' | 'assess' | 'explain' | 'escalate' | 'planner';
+export type BedrockJob = 'checkin' | 'assess' | 'explain' | 'escalate' | 'planner' | 'guardrail'; // guardrail: reply screening (Job 6)
 
 /** ISO 8601 string in UTC (virtual time where noted). */
 export type Timestamp = string;
