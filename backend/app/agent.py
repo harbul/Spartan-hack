@@ -96,16 +96,16 @@ def _action(case: dict[str, Any]) -> str:
 def greedy_plan(outage_id: str, reason: str = "") -> Plan:
     """Fallback if the agent loops or fails: priority first, then nearest neighbor.
 
-    Cases at or above tools.COVER_PRIORITY in priority order; each goes to the
+    Cases that must be covered (tools.must_cover) in priority order; each goes to the
     volunteer whose last stop (or start) is nearest and who still has room.
     """
     volunteers = tools.list_volunteers()
     runs: dict[str, list[dict[str, Any]]] = {v["volunteer_id"]: [] for v in volunteers}
     last = {v["volunteer_id"]: (v["start"]["lat"], v["start"]["lng"]) for v in volunteers}
     seats = {v["volunteer_id"]: v["capacity"] for v in volunteers}
-    for case in tools.list_open_cases(outage_id):
-        if case["priority"] < tools.COVER_PRIORITY:
-            break  # sorted by priority
+    for case in tools.list_open_cases(outage_id):  # highest priority first
+        if not tools.must_cover(case):
+            continue
         action = _action(case)
         room = [vid for vid, stops in runs.items() if len(stops) < tools.MAX_STOPS]
         if action == "ride" and not any(seats[vid] for vid in room):
