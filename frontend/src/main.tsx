@@ -12,6 +12,7 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import './index.css';
 import CommandCenter from './pages/CommandCenter';
+import Map3DTest from './pages/Map3DTest';
 import Phone from './pages/Phone';
 import RunSheet from './pages/RunSheet';
 
@@ -26,6 +27,8 @@ createRoot(document.getElementById('root')!).render(
           <Route path="/" element={<CommandCenter />} />
           <Route path="/phone" element={<Phone />} />
           <Route path="/run/:runId" element={<RunSheet />} />
+          {/* THROWAWAY (H0-H1): 3D map test, delete with pages/Map3DTest.tsx */}
+          <Route path="/3d-test" element={<Map3DTest />} />
         </Routes>
       </BrowserRouter>
     </QueryClientProvider>

@@ -9,7 +9,32 @@
  * Data: /dashboard (outage, cases, resources, volunteers, plan).
  * Implements: PLAN.md §6 (3D map), §9.1 center. Owner: P1 (Frontend and UX).
  */
+import { useEffect, useRef } from 'react';
+import { EAST_SAN_JOSE, amazonStyleUrl, hasLocationKey, withLocationKey } from './amazonStyle';
+import { maplibregl } from './maplibre';
+
 export default function IncidentMap() {
-  // TODO(P1, §6, §9.1): MUST tier is a flat 2D satellite map; 3D is the SHOULD upgrade.
-  return null;
+  const container = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!container.current || !hasLocationKey) return;
+    const map = new maplibregl.Map({
+      container: container.current,
+      style: amazonStyleUrl('Hybrid'),
+      transformRequest: withLocationKey,
+      ...EAST_SAN_JOSE,
+    });
+    map.addControl(new maplibregl.NavigationControl(), 'top-right');
+    // TODO(P1, §6, §9.1): layers, markers, fly-to; 3D (SHOULD tier) uses the approach chosen on /3d-test.
+    return () => map.remove();
+  }, []);
+
+  if (!hasLocationKey) {
+    return (
+      <div className="flex h-full w-full items-center justify-center bg-stone-200 text-sm text-stone-600">
+        Map needs VITE_LOCATION_API_KEY (see .env.example)
+      </div>
+    );
+  }
+  return <div ref={container} className="h-full w-full" />;
 }

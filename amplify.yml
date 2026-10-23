@@ -1,0 +1,24 @@
+# Amplify Hosting build for the frontend (monorepo: the app lives in frontend/).
+# In the Amplify console, connect the repo with "monorepo" ticked and root `frontend`
+# (sets AMPLIFY_MONOREPO_APP_ROOT=frontend), and set VITE_API_URL,
+# VITE_LOCATION_API_KEY and VITE_LOCATION_REGION as environment variables.
+# Implements: PLAN.md §6 (Amplify Hosting). Owner: P2 (Backend and infra).
+version: 1
+applications:
+  - appRoot: frontend
+    frontend:
+      phases:
+        preBuild:
+          commands:
+            - nvm install 22 && nvm use 22 # Vite 8 needs Node 20.19+
+            - npm ci
+        build:
+          commands:
+            - npm run build
+      artifacts:
+        baseDirectory: dist
+        files:
+          - "**/*"
+      cache:
+        paths:
+          - node_modules/**/*
