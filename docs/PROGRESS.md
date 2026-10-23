@@ -16,11 +16,21 @@
 ## Current status
 
 - **Current phase:** H1–H4 (each part works alone), started while H0–H1 waits on AWS credentials
-- **Last updated:** 2026-10-23 03:50 UTC · Claude session
+- **Last updated:** 2026-10-23 03:52 UTC · Claude session
 - **Overall health:** 🟡 H1–H4 code is done and tested without AWS; nothing has run against real Bedrock or DynamoDB yet (no credentials)
 - **Gates:**
   - H0–H1 "Deployed URL returns a Bedrock reply; 3D path chosen" · ⬜ not met (no AWS credentials). 3D path chosen provisionally (Amazon `Terrain3D`)
   - H1–H4 "Each part works alone" · 🟡 met with stubs and mocks: P1 screens on mock JSON, P2 routes on a fake DynamoDB, P3 Jobs 1–2 on a stubbed Bedrock, P4 data validated. Real-AWS check pending
+
+### Done vs remaining (snapshot)
+
+| Area | Done (merged to `main`) | Remaining |
+|---|---|---|
+| **AWS** | SAM template (Lambda, HTTP API, 8 tables, bucket, map key, scoped Bedrock IAM), `amplify.yml`, deploy + smoke-test steps in README | Credentials, Bedrock model access, first `sam deploy`, Amplify app, then run the smoke test |
+| **P2 Backend** | `/health`, `/hello-bedrock` (debug), `/demo/reset`, `/outages`, `store.py` (all tables), `geo.py` | `/outages/{id}/checkins`, `/inbound`, `/clock/advance`, `triage.py`, `escalation.py`, `/dashboard`, `/residents/{id}/messages`, `/traces`, `/plans`, approve, stop done, `/runs/{id}`, `location.py`, 1-minute schedule |
+| **P3 AI** | `converse()` + trace rows, Job 1 check-ins, Job 2 reply assessment (+ photo, forced tool), prompts for Jobs 1–2, privacy word check | Job 3 explainer, Job 4 escalation drafter, Job 5 agent + tools, eval run (18/20), Guardrails, fallback model |
+| **P1 Frontend** | Command center (4 areas), timeline, phone simulator, flat map with zone/residents/resources, all on mock data; `/3d-test` | Switch `useDashboard()` to the API, wire the action bar, AI Trace list, Plan tab + Approve, routes layer, volunteer view (`/run/:runId`), 3D (SHOULD), About panel |
+| **P4 Story/data** | 40 residents, zone, resources, volunteers, 20 labeled replies | 2 reply photos, `sources.md`, architecture diagram, video script, safety video (H8) |
 
 ---
 
@@ -53,13 +63,13 @@ From [PLAN.md §11](PLAN.md#11-scope-tiers). Tick items as they are finished.
 ### MUST: the golden path, green by H8
 
 - [ ] Seed data, plus a Reset demo button (data and `/demo/reset` done; button drives the mock until H4–H6)
-- [ ] Outage zone → affected residents on a **flat (2D) satellite map**, markers colored by status
-- [ ] Job 1: check-ins sent (shown in the phone simulator)
-- [ ] Job 2: text replies → assessment → Job 3: score and "why" in the queue
-- [ ] Timeline bar (forward only: play and jump buttons, counters, event markers) plus escalation L1 to L3 (Job 4)
+- [ ] Outage zone → affected residents on a **flat (2D) satellite map**, markers colored by status (`/outages` + map layers done; map runs on mock data, satellite needs the key)
+- [ ] Job 1: check-ins sent (shown in the phone simulator) (Job 1 done; `/checkins` route and phone wiring remain)
+- [ ] Job 2: text replies → assessment → Job 3: score and "why" in the queue (Job 2 done; `/inbound`, triage, Job 3 remain)
+- [ ] Timeline bar (forward only: play and jump buttons, counters, event markers) plus escalation L1 to L3 (Job 4) (timeline UI done on mock; `/clock/advance`, escalation, Job 4 remain)
 - [ ] Job 5: agent plan → routes on the map → Approve → volunteer view
-- [ ] AI Trace drawer
-- [ ] Deployed: Amplify URL plus the SAM stack
+- [ ] AI Trace drawer (trace rows written; `/traces` route and the list UI remain)
+- [ ] Deployed: Amplify URL plus the SAM stack (template ready; blocked on credentials)
 
 ### SHOULD: H8 to H12
 
@@ -128,7 +138,7 @@ Newest entry on top. Template:
 ```
 
 ### 2026-10-23 · H1–H4 · Each part works alone (offline)
-**By:** Claude session · **Branch/PR:** [`claude/focused-einstein-cqibah`](https://github.com/harbul/Spartan-hack/compare/main...neels22:Spartan-hack:claude/focused-einstein-cqibah)
+**By:** Claude session · **Branch/PR:** [`claude/focused-einstein-cqibah`](https://github.com/harbul/Spartan-hack/compare/main...neels22:Spartan-hack:claude/focused-einstein-cqibah), merged via [neels22/Spartan-hack#2](https://github.com/neels22/Spartan-hack/pull/2)
 **Done:**
 - P4: [`residents.json`](../data/residents.json) 40 residents (15 EN, 13 ES, 12 VI; all device types; all inside the zone), [`resources.json`](../data/resources.json) 2 CRCs + pharmacy just outside the zone, [`volunteers.json`](../data/volunteers.json) 3 volunteers, [`test_replies.json`](../data/test_replies.json) 20 labeled replies with expected bands from §5. Checked by [`test_seed_data.py`](../backend/tests/test_seed_data.py).
 - P2: [`store.py`](../backend/app/store.py) for every §7 table (Decimal in/out, per-thread boto3), reseed from `data/`; [`geo.py`](../backend/app/geo.py) point-in-polygon + nearest resource; `POST /demo/reset`, `POST /outages` (affected residents, cases, `outage_started` event); shared 503/502 error handlers.
@@ -149,7 +159,7 @@ Newest entry on top. Template:
 - H4–H6: P2 `/inbound`, `/clock/advance`, triage (with the supply fallback below), escalation, `/dashboard`; P3 Jobs 3–4 + eval run; P1 swap `useDashboard()` to the API; P4 the 2 photos, sources, script draft.
 
 ### 2026-10-23 · H0–H1 · Walking skeleton (code done, deploy blocked)
-**By:** Claude session · **Branch/PR:** [`claude/focused-einstein-cqibah`](https://github.com/harbul/Spartan-hack/compare/main...neels22:Spartan-hack:claude/focused-einstein-cqibah)
+**By:** Claude session · **Branch/PR:** [`claude/focused-einstein-cqibah`](https://github.com/harbul/Spartan-hack/compare/main...neels22:Spartan-hack:claude/focused-einstein-cqibah), merged via [neels22/Spartan-hack#4](https://github.com/neels22/Spartan-hack/pull/4)
 **Done:**
 - P3: `converse()` in [`bedrock.py`](../backend/app/bedrock.py): Converse API, model IDs from env at call time, returns text, `model_id`, `latency_ms`, tokens, `stop_reason` and the raw response. TODOs where tracing (§4), Guardrails (§4 Job 6) and the fallback model (§16) plug in.
 - P2: `GET /health` and skeleton `GET /hello-bedrock` in [`main.py`](../backend/app/main.py); clear 503 when model IDs are unset, 502 with the AWS error code otherwise. CORS for local runs.
