@@ -49,11 +49,11 @@ The golden path in the app:
 
 Owner: **P2**, with **P3** on steps 2, 6 and 7 and **P4** on step 8. **Every AWS service, permission, quota and value is listed in [AWS_SETUP.md](AWS_SETUP.md)**; work through it for steps 1–5. Commands are in [README → Deploy](../README.md#deploy).
 
-1. **Credentials:** `aws configure`; region `us-west-2` unless the event says otherwise (record it in PROGRESS.md).
-2. **Bedrock model access:** request a fast and a strong Claude model in the console, then list the inference profile IDs (`aws bedrock list-inference-profiles`).
-3. **Deploy:** in `infra/`, run `sam build && sam deploy --guided`. Stack `stillhere`; enter the two model IDs. The stack also creates the map key and both guardrails.
+1. **Credentials:** temporary ones from the Workshop Studio event page (they expire; copy fresh ones when calls fail). Region **`us-east-1`**, the only one the event allows ([AWS_SETUP.md](AWS_SETUP.md#what-we-found-in-the-event-account-2026-10-23)).
+2. **Bedrock model access:** already enabled. The tested IDs (fast Haiku 4.5, strong Sonnet 4.6) are the defaults in `.env.example` and the SAM parameters ([AWS_SETUP.md §1](AWS_SETUP.md#1-amazon-bedrock)).
+3. **Deploy:** in `infra/`, run `sam build && sam deploy --guided`. Stack `stillhere`, region `us-east-1`. The event account can't create IAM roles, so pick the mode in [AWS_SETUP.md §2](AWS_SETUP.md#2-deploy-the-stack): `FunctionRoleArn` if the organizers give us a role, else `DeployApi=false` and run the backend locally. Every mode creates the tables, the map key and both guardrails.
 4. **Map key:** `aws location describe-key --key-name stillhere-maps --query Key --output text`. Put it in `.env` and in Amplify.
-5. **Amplify app:** connect the repo as a monorepo with root `frontend` (`amplify.yml`). Set `VITE_API_URL`, `VITE_LOCATION_API_KEY` and `VITE_LOCATION_REGION`, add the SPA rewrite rule from the README, and leave `VITE_USE_MOCK` unset.
+5. **Amplify app** (needs a deployed API, so not in `DeployApi=false` mode): connect the repo as a monorepo with root `frontend` (`amplify.yml`). Set `VITE_API_URL`, `VITE_LOCATION_API_KEY` and `VITE_LOCATION_REGION`, add the SPA rewrite rule from the README, and leave `VITE_USE_MOCK` unset.
 6. **Smoke test** ([README → Deploy](../README.md#deploy)): hello-bedrock, reset, outages (40 affected), check-ins, inbound, clock, `/plans` (**time it: under ~20 s**), approve, run.
 7. **AI eval:** `python tests/eval_replies.py` in `backend/` must reach **18/20 with no privacy hits**. Fix the prompts in `backend/app/prompts/` until it does.
 8. **Gate:** 3 clean runs of the golden path on the deployed URL, then **record the safety video** (PLAN.md §14).

@@ -108,15 +108,18 @@ Full checklist (what to enable, permissions, quotas, which value goes where): [d
 ```bash
 # Backend (from infra/): Lambda + HTTP API + tables + browser map key
 sam build
-sam deploy --guided               # stack name: stillhere, region: us-west-2,
-                                  # BedrockFastModelId / BedrockStrongModelId = inference profile IDs,
+sam deploy --guided               # stack name: stillhere, region: us-east-1 (the only one the event allows),
+                                  # model IDs: keep the defaults (tested, docs/AWS_SETUP.md §1),
+                                  # FunctionRoleArn / DeployApi: the mode, docs/AWS_SETUP.md §2
+                                  #   (the event account can't create IAM roles: DeployApi=false
+                                  #   unless the organizers give us a role),
                                   # "ApiFunction has no authentication. Is this okay?" -> y
                                   # (answers are saved to infra/samconfig.toml, gitignored)
 # Later deploys: sam build && sam deploy
 
 # Values for .env and Amplify, from the stack outputs
 aws cloudformation describe-stacks --stack-name stillhere \
-  --query "Stacks[0].Outputs" --output table          # ApiUrl -> VITE_API_URL
+  --query "Stacks[0].Outputs" --output table          # ApiUrl -> VITE_API_URL (no ApiUrl with DeployApi=false)
 aws location describe-key --key-name stillhere-maps \
   --query Key --output text                           # -> VITE_LOCATION_API_KEY
 ```

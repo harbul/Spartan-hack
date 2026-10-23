@@ -15,10 +15,10 @@
 
 ## Current status
 
-- **Current phase:** H8–H12 (SHOULD tier) in progress, built offline. The H7–H8 gate (golden path on the deployed URL + safety video) waits on AWS credentials
+- **Current phase:** H8–H12 (SHOULD tier) in progress, built offline. AWS credentials are here (Workshop Studio, `us-east-1` only); the H7–H8 gate now waits on the deploy, and the event account can't create IAM roles (see the AWS entry in the Phase log)
 - **Handoff:** new to the project or picking up a role? Start at **[HANDOFF.md](HANDOFF.md)**: status, the AWS critical path, and remaining work by role
-- **Last updated:** 2026-10-23 19:35 UTC · Claude session
-- **Overall health:** 🟡 MUST golden path and most of SHOULD are code-complete and tested without AWS (117 tests, `npm run build`, live UI against the real API with in-memory tables and stand-in Bedrock and Location). Nothing has run on real AWS yet (no credentials); that is the only blocker for H7–H8
+- **Last updated:** 2026-10-23 21:30 UTC · Claude session
+- **Overall health:** 🟡 MUST golden path and most of SHOULD are code-complete and tested without AWS (117 tests, `npm run build`, live UI against the real API with in-memory tables and stand-in Bedrock and Location). Credentials are here and pre-flighted: Bedrock (Haiku 4.5, Sonnet 4.6) and Amazon Location answer in `us-east-1`. Nothing is deployed yet: the account can't create IAM roles, so the Lambda needs a role from the organizers (`FunctionRoleArn`) or we run the backend locally (`DeployApi=false`), [AWS_SETUP.md §2](AWS_SETUP.md#2-deploy-the-stack)
 - **Gates:**
   - H0–H1 "Deployed URL returns a Bedrock reply; 3D path chosen" · ⬜ not met (no AWS credentials). 3D path chosen provisionally (Amazon `Terrain3D`)
   - H1–H4 "Each part works alone" · 🟡 met with stubs and mocks; real-AWS check pending
@@ -29,7 +29,7 @@
 
 | Area | Done (merged to `main`) | Remaining |
 |---|---|---|
-| **AWS** | SAM template (Lambda, HTTP API, 8 tables, bucket, map key, 2 guardrails, scoped Bedrock + Location + Guardrail IAM, 1-minute schedule), `amplify.yml`, deploy + smoke-test steps in README | Credentials, model access, first `sam deploy`, Amplify app, README smoke test (incl. `/plans`), `eval_replies.py`, 3 clean runs (HANDOFF.md §4) |
+| **AWS** | SAM template (Lambda, HTTP API, 8 tables, bucket, map key, 2 guardrails, scoped Bedrock + Location + Guardrail IAM, 1-minute schedule), `amplify.yml`, deploy + smoke-test steps in README Organizers' answer on IAM (mode A/B/C), first `sam deploy` in `us-east-1`, Amplify app (modes A/B), README smoke test (incl. `/plans`), `eval_replies.py`, 3 clean runs (HANDOFF.md §4). Credentials and model access: done |
 | **P2 Backend** | Every §8 route; `store`, `geo`, `triage`, `escalation`, `location` (+ straight-line fallback), scheduled check; reply screening never blocks a reply | Real-AWS check; lock CORS and map-key referers; `/demo/reset` response; confirm PROPOSED shapes; 2 stale TODO comments |
 | **P3 AI** | `converse()` + traces, Jobs 1–5 with prompts (Job 5 agent with rules in code + greedy fallback), privacy by construction, Guardrails (advice on SMS + reply screening, PII masking in traces), eval script | Eval on real Bedrock (18/20); time the agent (< ~20 s; PII masking latency); fallback model retry; ES/VI end to end; photo replies once photos exist; Guardrail shot |
 | **P1 Frontend** | Command center on the live API (action bar 1–4, Plan tab, routes), 3D map (terrain, toggles, fly-to), pulsing no-reply markers, About panel, timeline, phone simulator (+ Others reply), route sheet, AI Trace list (+ guardrail result); mock behind `VITE_USE_MOCK` | Polish + loading/empty/error states; backup-hours countdown in queue cards; agent step detail in AI Trace; check satellite/buildings/pulse with the key; delete mock and `/3d-test` after the gate |
@@ -139,6 +139,40 @@ Newest entry on top. Template:
 **Next steps:** (who does what next)
 - ...
 ```
+
+### 2026-10-23 · H0–H1 · Event AWS account pre-flight, `us-east-1`, deploy modes
+**By:** Claude session · **Branch/PR:** [`claude/zealous-keller-yvesgv`](https://github.com/neels22/Spartan-hack/tree/claude/zealous-keller-yvesgv)
+**Done:**
+- Pre-flight with the event credentials (read-only, plus about 10 one-line Bedrock calls and 3 Location calls; nothing created). Results in [AWS_SETUP.md → What we found](AWS_SETUP.md#what-we-found-in-the-event-account-2026-10-23):
+  - Workshop Studio account: `WSParticipantRole` = `PowerUserAccess` + `ws-default-policy`. Temporary credentials.
+  - Only `us-east-1` (every other region is denied).
+  - **No IAM role creation;** `iam:PassRole` only on `WSParticipantRole`, which Lambda can't assume. The default `sam deploy` would fail on the Lambda and Scheduler roles.
+  - Everything else the stack uses is allowed in `us-east-1`. Bedrock quotas: 10,000 requests per minute per model, ApplyGuardrail 100 per second.
+- Bedrock models tested with Converse in `us-east-1`:
+  - Fast `us.anthropic.claude-haiku-4-5-20251001-v1:0` and strong `us.anthropic.claude-sonnet-4-6` answer, including forced tool choice with `temperature`.
+  - Fallback `us.anthropic.claude-sonnet-4-5-20250929-v1:0` answers.
+  - Haiku 5.5 is denied (marketplace). Sonnet 5.5 rejects forced tool choice and `temperature`; Sonnet 5 rejects `temperature`.
+- Amazon Location in `us-east-1`: the Hybrid style descriptor with `terrain=Terrain3D` returns `terrainSource`; `CalculateRoutes` and `OptimizeWaypoints` return results with IAM credentials.
+- `infra/template.yaml`, three deploy modes:
+  - default: unchanged behavior;
+  - `FunctionRoleArn`: an existing role for the Lambda and the schedule, no IAM roles created;
+  - `DeployApi=false`: tables, bucket, guardrails and map key only.
+
+  Model parameters now default to the tested IDs. The 1-minute schedule is an explicit `AWS::Scheduler::Schedule` + `SchedulerRole` (was a SAM `ScheduleV2` event), because SAM drops its own scheduler role when `RoleArn` is an `Fn::If`.
+- Region `us-east-1` and the tested model IDs in `.env.example`; frontend map region default `us-east-1` (`amazonStyle.ts`). AWS_SETUP.md rewritten with the findings and the modes; README and HANDOFF.md §4 point to them. PLAN.md §16: new risk row.
+- Checks:
+  - `cfn-lint` and `sam validate --lint` pass, and `sam build` passes (43 MB).
+  - The SAM transform was run for each mode, to check what each creates and that no reference dangles. Default: 19 resources, roles `ApiFunctionRole` and `SchedulerRole`. `FunctionRoleArn`: 17 resources, no roles. `DeployApi=false`: 12 resources, no roles.
+  - `pytest` and `npm run build` pass.
+**Not done / cut:**
+- Not deployed: needs the organizers' answer, or the team's go-ahead for `DeployApi=false`.
+- Photo input on Sonnet 4.6 not tested.
+**Decisions made:** see the Decisions log (region, model IDs, deploy modes, explicit schedule).
+**Blockers / risks:**
+- IAM: mode C has no public API URL (record the demo locally), and the backend must be restarted when the temporary credentials expire. The "deployed URL" part of the H0–H1 and H7–H8 gates needs mode A or B.
+**Next steps:**
+- P2: ask the organizers for IAM role creation or a Lambda role (exact ask in [AWS_SETUP.md §2, mode B](AWS_SETUP.md#2-deploy-the-stack)). Meanwhile deploy mode C and run the README smoke test locally.
+- P3: `eval_replies.py` on real Bedrock with the tested models.
 
 ### 2026-10-23 · Handoff · AWS setup checklist
 **By:** Claude session · **Branch/PR:** [`claude/focused-einstein-cqibah`](https://github.com/harbul/Spartan-hack/compare/main...neels22:Spartan-hack:claude/focused-einstein-cqibah)
@@ -421,6 +455,11 @@ Decisions that change or clarify the plan. If one changes the plan, `PLAN.md` is
 | 2026-10-23 | A reply asking for medical advice is screened, flagged for human review, and still assessed by Job 2 | Blocking Job 2's input would leave the case with no assessment; the app never answers residents anyway | Claude session |
 | 2026-10-23 | `BedrockJob` gains `"guardrail"` (schemas.py + types.ts) | Reply screening is a Bedrock call with its own trace row in the AI Trace drawer | Claude session |
 | 2026-10-23 | The incident map opens in 3D (pitch 60°, bearing 60°) | The foothills are the visual of the video; 2D stays one click away | Claude session |
+| 2026-10-23 | **Region `us-east-1`** (closes the "AWS account" region question) | The event's Workshop Studio policy denies every other region; `.env.example`, the frontend map default, README and AWS_SETUP.md now use it | Claude session (event account) |
+| 2026-10-23 | **Model IDs:** fast `us.anthropic.claude-haiku-4-5-20251001-v1:0`, strong `us.anthropic.claude-sonnet-4-6`, fallback `us.anthropic.claude-sonnet-4-5-20250929-v1:0`; defaults in `.env.example` and the SAM parameters (replaces "none yet") | Tested with Converse in the event account. Haiku 5.5 is denied (marketplace); Sonnet 5.5 rejects forced tool choice and `temperature`, which Job 2 and `converse()` use | Claude session |
+| 2026-10-23 | **Three deploy modes in `infra/template.yaml`:** default (creates roles), `FunctionRoleArn` (existing role, no roles created), `DeployApi=false` (tables, bucket, guardrails, map key; backend runs locally) (closes "Services allowed in the event account") | The event account can't create IAM roles (`PowerUserAccess`; `iam:PassRole` only on `WSParticipantRole`); one template still covers every answer from the organizers | Claude session |
+| 2026-10-23 | The 1-minute schedule is an explicit `AWS::Scheduler::Schedule` with its own `SchedulerRole` (no longer a SAM `ScheduleV2` event) | With `RoleArn` as an `Fn::If`, SAM creates no scheduler role at all, which would break the default mode; explicit resources can follow the mode | Claude session |
+| 2026-10-23 | Amazon Location `Terrain3D` path confirmed in `us-east-1` too (style descriptor returns `terrainSource`) | Region moved; the 3D decision above was checked in `us-west-2` | Claude session |
 
 ---
 
@@ -431,10 +470,9 @@ Waiting on the team or organizers. When answered, remove it here and record the 
 From [PLAN.md §18](PLAN.md#18-pre-event-checklist-and-open-questions):
 
 - [ ] **Event schedule:** hacking has started; record the exact H0 clock time so H0 to H18 maps to the clock.
-- [ ] **AWS account:** credentials not here yet. Region assumed `us-west-2` (in `.env.example` and the README); confirm. Bedrock model access for one fast and one strong Claude model, and their inference profile IDs.
-- [ ] **Amazon Location:** style and 3D terrain are confirmed at the style level in us-west-2, and `OptimizeWaypoints`/`CalculateRoutes` are built with a straight-line fallback. Still open: a visual check with the key, and real routes on the deploy. Mapbox token only if both Amazon options fail.
+- [ ] **IAM in the event account:** it can't create roles, so the Lambda can't be deployed as is. Ask the organizers to allow role creation (mode A) or to provide a Lambda role (mode B; exact ask in [AWS_SETUP.md §2](AWS_SETUP.md#2-deploy-the-stack)). Until then, mode C (`DeployApi=false`, backend run locally). (P2)
+- [ ] **Amazon Location:** style and 3D terrain are confirmed at the style level in us-west-2 and `us-east-1`, and `OptimizeWaypoints`/`CalculateRoutes` answer in `us-east-1` (a straight-line fallback stays). Still open: a visual check with the key, and real routes on the deploy. Mapbox token only if both Amazon options fail.
 - [ ] **Accounts:** an Amplify app connected to this repo; a screen recorder ready (for example OBS).
-- [ ] **Services allowed in the event account:** event accounts are often restricted. Confirm Bedrock (incl. Guardrails), Location, Lambda, API Gateway, DynamoDB, S3, EventBridge Scheduler, CloudFormation, IAM role creation and Amplify are all usable before deploying. Full list: [AWS_SETUP.md §0](AWS_SETUP.md#0-pre-flight-do-before-anything-else). (P2)
 - [ ] **Which repo Amplify connects:** the team repo `harbul/Spartan-hack` or the fork? It deploys `main` on every push. (P2)
 - [ ] **Submission:** where the video is uploaded, the accepted format, and the event channel for judge questions. Record answers in `docs/submission.md`.
 

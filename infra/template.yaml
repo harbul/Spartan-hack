@@ -4,6 +4,11 @@
 # Deploy from infra/: `sam build && sam deploy --guided`.
 # Amplify Hosting (frontend) is connected to the repo in the console, not here.
 #
+# The event account can't create IAM roles (docs/AWS_SETUP.md §0), so there are three ways to deploy:
+#   default                    the stack creates the Lambda and Scheduler roles
+#   FunctionRoleArn=<arn>      use an existing role (e.g. one the organizers provide); no roles created
+#   DeployApi=false            tables, bucket, guardrails and map key only (no roles); run the backend locally
+#
 # Implements: PLAN.md §6 (architecture), §7 (tables), §5 (1-minute escalation schedule).
 # Owner: P2 (Backend and infra).
 AWSTemplateFormatVersion: "2010-09-09"
@@ -11,16 +16,19 @@ Transform: AWS::Serverless-2016-10-31
 Description: StillHere - emergency response command center (SpartHill Hacks 2026)
 
 Parameters:
+  # Defaults are the models tested in the event account (us-east-1), docs/AWS_SETUP.md §1.
   BedrockFastModelId:
     Type: String
-    Description: Cross-region inference profile ID for the fast model (confirm in hour 0)
+    Default: us.anthropic.claude-haiku-4-5-20251001-v1:0
+    Description: Cross-region inference profile ID for the fast model
   BedrockStrongModelId:
     Type: String
-    Description: Cross-region inference profile ID for the strong model (confirm in hour 0)
+    Default: us.anthropic.claude-sonnet-4-6
+    Description: Cross-region inference profile ID for the strong model (needs forced tool choice and temperature)
   BedrockFallbackModelId:
     Type: String
-    Default: ""
-    Description: Fallback model ID if access to the main ones is slow or denied (PLAN.md §16)
+    Default: us.anthropic.claude-sonnet-4-5-20250929-v1:0
+    Description: Fallback model ID if access to the main ones is slow or denied (PLAN.md §16); empty for none
   BedrockGuardrailId:
     Type: String
     Default: ""
@@ -33,10 +41,29 @@ Parameters:
     Default: ""
     NoEcho: true
     Description: Optional. Amazon Location API key for Routes; leave empty to use the Lambda role.
+  FunctionRoleArn:
+    Type: String
+    Default: ""
+    Description: >-
+      Optional. An existing IAM role for the Lambda and the 1-minute schedule, for accounts that can't create roles.
+      It must trust lambda.amazonaws.com and scheduler.amazonaws.com and allow what ApiFunction's Policies allow.
+      Empty = the stack creates both roles.
+  DeployApi:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: >-
+      false = deploy only the tables, bucket, guardrails and map key (no IAM roles, no Lambda, no API),
+      then run the backend locally with your own credentials (docs/AWS_SETUP.md §2).
 
 Conditions:
   HasFallbackModel: !Not [!Equals [!Ref BedrockFallbackModelId, ""]]
   HasGuardrailParam: !Not [!Equals [!Ref BedrockGuardrailId, ""]]
+  HasFunctionRole: !Not [!Equals [!Ref FunctionRoleArn, ""]]
+  ApiEnabled: !Equals [!Ref DeployApi, "true"]
+  # SAM creates ApiFunctionRole only when this is false (it reads the Fn::If on Role).
+  SkipFunctionRole: !Or [!Condition HasFunctionRole, !Not [!Condition ApiEnabled]]
+  CreateSchedulerRole: !Not [!Condition SkipFunctionRole]
 
 Globals:
   Function:
@@ -66,6 +93,7 @@ Globals:
 Resources:
   HttpApi:
     Type: AWS::Serverless::HttpApi
+    Condition: ApiEnabled
     Properties:
       CorsConfiguration:
         AllowOrigins: ["*"] # TODO(P2): restrict to the Amplify URL and localhost
@@ -74,9 +102,12 @@ Resources:
 
   ApiFunction:
     Type: AWS::Serverless::Function
+    Condition: ApiEnabled
     Properties:
       CodeUri: ../backend/
       Handler: app.main.handler
+      # With FunctionRoleArn set, SAM creates no role and ignores Policies below.
+      Role: !If [SkipFunctionRole, !Ref FunctionRoleArn, !Ref AWS::NoValue]
       # TODO(P2): /demo/reset reseeds from data/, which is outside CodeUri.
       # See docs/PROGRESS.md, Open questions.
       Events:
@@ -86,12 +117,6 @@ Resources:
             ApiId: !Ref HttpApi
             Path: /{proxy+}
             Method: ANY
-        # Real-time silence check (PLAN.md §5); main.handler routes this Input.
-        EscalationCheck:
-          Type: ScheduleV2 # EventBridge Scheduler
-          Properties:
-            ScheduleExpression: rate(1 minute)
-            Input: '{"stillhere": "escalation_check"}'
       Policies:
         - DynamoDBCrudPolicy: { TableName: !Ref ResidentsTable }
         - DynamoDBCrudPolicy: { TableName: !Ref OutagesTable }
@@ -156,6 +181,39 @@ Resources:
                 - geo-routes:OptimizeWaypoints
                 - geo-routes:CalculateRoutes
               Resource: !Sub arn:${AWS::Partition}:geo-routes:${AWS::Region}::provider/default
+
+  # Real-time silence check (PLAN.md §5); main.handler routes this Input.
+  # Written out (not a SAM ScheduleV2 event) so it can use FunctionRoleArn or its own role.
+  # The demo doesn't need it: "+3 h" (POST /clock/advance) runs the same check.
+  EscalationSchedule:
+    Type: AWS::Scheduler::Schedule
+    Condition: ApiEnabled
+    Properties:
+      ScheduleExpression: rate(1 minute)
+      FlexibleTimeWindow: { Mode: "OFF" }
+      Target:
+        Arn: !GetAtt ApiFunction.Arn
+        RoleArn: !If [HasFunctionRole, !Ref FunctionRoleArn, !GetAtt SchedulerRole.Arn]
+        Input: '{"stillhere": "escalation_check"}'
+
+  SchedulerRole:
+    Type: AWS::IAM::Role
+    Condition: CreateSchedulerRole
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: scheduler.amazonaws.com }
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: InvokeApiFunction
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !GetAtt ApiFunction.Arn
 
   # --- DynamoDB tables (PLAN.md §7), all on-demand ---------------------------
   # Named <stack>-<table> so local runs can use the .env.example names (stack `stillhere`).
@@ -304,6 +362,7 @@ Resources:
 Outputs:
   ApiUrl:
     Description: Base URL for VITE_API_URL
+    Condition: ApiEnabled
     Value: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com"
   MapsApiKeyName:
     Description: >-

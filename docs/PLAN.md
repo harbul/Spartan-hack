@@ -536,6 +536,7 @@ Tie-breaks run in the order item 2, item 1, item 3, which matches where we spend
 | Risk | Mitigation |
 |---|---|
 | Bedrock model access is slow or denied | Request in the first minutes. A fallback model ID in env (another Claude tier or Amazon Nova) |
+| The event account can't create IAM roles (Workshop Studio: PowerUserAccess, `us-east-1` only) | Ask the organizers for a Lambda role and deploy with `FunctionRoleArn`. Otherwise `DeployApi=false` (tables, bucket, guardrails, map key) and run the backend locally with participant credentials (AWS_SETUP.md §2) |
 | LLM latency drags the demo | Fast model for bulk jobs, parallel check-ins, spinners and streaming. Trims marked "sped up" |
 | Wrong or hallucinated triage | Forced tool schema, deterministic score, confidence threshold sends low-confidence cases to human review, approval before dispatch |
 | Agent loops or fails | Max 12 turns. Fallback: a greedy planner in code (priority, then nearest neighbor) |
