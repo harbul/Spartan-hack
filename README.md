@@ -16,6 +16,7 @@ Spartan-hack/
 │   ├── PLAN.md               the build plan
 │   ├── PROGRESS.md           phase status, scope tracker, decisions, open questions
 │   ├── HANDOFF.md            start here: status, critical path, remaining work by role
+│   ├── AWS_SETUP.md          every AWS service, permission and value the project needs
 │   ├── architecture.svg      architecture diagram for the video (§6)
 │   ├── video_script.md       5-minute video script (§14)
 │   ├── sources.md            cited stats for the persona (§18)
@@ -101,6 +102,8 @@ npm run build                     # type-check + production build
 ```
 
 ## Deploy
+
+Full checklist (what to enable, permissions, quotas, which value goes where): [docs/AWS_SETUP.md](docs/AWS_SETUP.md).
 
 ```bash
 # Backend (from infra/): Lambda + HTTP API + tables + browser map key

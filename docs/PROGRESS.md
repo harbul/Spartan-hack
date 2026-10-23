@@ -140,6 +140,16 @@ Newest entry on top. Template:
 - ...
 ```
 
+### 2026-10-23 · Handoff · AWS setup checklist
+**By:** Claude session · **Branch/PR:** [`claude/focused-einstein-cqibah`](https://github.com/harbul/Spartan-hack/compare/main...neels22:Spartan-hack:claude/focused-einstein-cqibah)
+**Done:**
+- [AWS_SETUP.md](AWS_SETUP.md): every AWS service, permission, quota and value the code needs, from `infra/template.yaml`, the boto3 calls, the env vars, `amplify.yml` and the map code. Pre-flight (services allowed, region, deployer permissions, tools), Bedrock (model access, profile IDs, quotas vs the code's parallelism), Location, what `sam deploy` creates, Amplify, where each value goes, cost, and what is not used.
+- Linked from HANDOFF.md §4 and README → Deploy. Two open questions added (services allowed in the event account; which repo Amplify connects).
+**Decisions made:**
+- Documented as-is: `LocationApiKey` (SAM parameter, `LOCATION_API_KEY`) is passed to the Lambda but not read; routes use the Lambda role. `BedrockFallbackModelId` is granted in IAM but unused until P3 adds the retry. No code or template change.
+**Next steps:**
+- P2: work through AWS_SETUP.md when credentials arrive, pre-flight first; P3 requests Bedrock model access as early as possible.
+
 ### 2026-10-23 · Handoff · Project handed to the team
 **By:** Claude session · **Branch/PR:** [`claude/focused-einstein-cqibah`](https://github.com/harbul/Spartan-hack/compare/main...neels22:Spartan-hack:claude/focused-einstein-cqibah)
 **Done:**
@@ -424,6 +434,8 @@ From [PLAN.md §18](PLAN.md#18-pre-event-checklist-and-open-questions):
 - [ ] **AWS account:** credentials not here yet. Region assumed `us-west-2` (in `.env.example` and the README); confirm. Bedrock model access for one fast and one strong Claude model, and their inference profile IDs.
 - [ ] **Amazon Location:** style and 3D terrain are confirmed at the style level in us-west-2, and `OptimizeWaypoints`/`CalculateRoutes` are built with a straight-line fallback. Still open: a visual check with the key, and real routes on the deploy. Mapbox token only if both Amazon options fail.
 - [ ] **Accounts:** an Amplify app connected to this repo; a screen recorder ready (for example OBS).
+- [ ] **Services allowed in the event account:** event accounts are often restricted. Confirm Bedrock (incl. Guardrails), Location, Lambda, API Gateway, DynamoDB, S3, EventBridge Scheduler, CloudFormation, IAM role creation and Amplify are all usable before deploying. Full list: [AWS_SETUP.md §0](AWS_SETUP.md#0-pre-flight-do-before-anything-else). (P2)
+- [ ] **Which repo Amplify connects:** the team repo `harbul/Spartan-hack` or the fork? It deploys `main` on every push. (P2)
 - [ ] **Submission:** where the video is uploaded, the accepted format, and the event channel for judge questions. Record answers in `docs/submission.md`.
 
 From the repo setup (2026-10-23):
