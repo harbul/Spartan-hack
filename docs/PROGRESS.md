@@ -15,23 +15,24 @@
 
 ## Current status
 
-- **Current phase:** H4–H6 (replies flow into the queue and onto the map), built offline while H0–H1 waits on AWS credentials
-- **Last updated:** 2026-10-23 04:10 UTC · Claude session
-- **Overall health:** 🟡 code through H4–H6 is done and tested without AWS (80 tests, plus the live UI against the real API with in-memory tables and stand-in Bedrock jobs). Nothing has run on real Bedrock or DynamoDB yet (no credentials)
+- **Current phase:** H6–H7 (plan renders), built offline while H0–H1 waits on AWS credentials. Next: H7–H8, the golden path on the deployed URL (needs AWS)
+- **Last updated:** 2026-10-23 04:50 UTC · Claude session
+- **Overall health:** 🟡 the whole MUST golden path is code-complete and tested without AWS (103 tests, plus the live UI against the real API with in-memory tables and stand-in Bedrock and Location). Nothing has run on real AWS yet (no credentials); that is now the only thing between us and the H7–H8 gate
 - **Gates:**
   - H0–H1 "Deployed URL returns a Bedrock reply; 3D path chosen" · ⬜ not met (no AWS credentials). 3D path chosen provisionally (Amazon `Terrain3D`)
   - H1–H4 "Each part works alone" · 🟡 met with stubs and mocks; real-AWS check pending
   - H4–H6 "Replies flow into the queue and onto the map" · 🟡 met offline: reset → zone → 40 check-ins → 4 phone replies → +3 h ends with Minh Critical, Rosa/Harold High, Denise OK, Lupe silent L3. Real-AWS check pending (README smoke test)
+  - H6–H7 "Plan renders" · 🟡 met offline: + Others reply → +3 h → plan (13 stops, 3 volunteers, routes on the map) → approve → route sheet → mark done. Real-AWS check pending (agent on real Bedrock, routes on real Amazon Location)
 
 ### Done vs remaining (snapshot)
 
 | Area | Done (merged to `main`) | Remaining |
 |---|---|---|
-| **AWS** | SAM template (Lambda, HTTP API, 8 tables, bucket, map key, scoped Bedrock IAM, 1-minute schedule), `amplify.yml`, deploy + smoke-test steps in README | Credentials, Bedrock model access, first `sam deploy`, Amplify app, then run the smoke test and `eval_replies.py` |
-| **P2 Backend** | `/health`, `/hello-bedrock` (debug), `/demo/reset`, `/outages`, `/outages/{id}/checkins`, `/inbound` (+ photo to S3), `/clock/advance`, `/dashboard`, `/residents/{id}/messages`, `/traces`; `store.py`, `geo.py`, `triage.py`, `escalation.py`, scheduled check | `/plans`, approve, stop done, `/runs/{id}`, `location.py` (H6–H7); CORS lock-down |
-| **P3 AI** | `converse()` + trace rows, Jobs 1–4 with prompts, privacy by construction for every SMS, eval script (Job 2 + triage, privacy check) | Run the eval on real Bedrock (18/20), Job 5 agent + tools (H6–H7), Guardrails + name/address masking, fallback model |
-| **P1 Frontend** | Command center on the live API (polling, action bar steps 1–2, busy/error states), timeline, phone simulator on `/inbound`, AI Trace list, flat map; mock behind `VITE_USE_MOCK`; `/3d-test` | Plan tab + Approve, routes layer, volunteer view (`/run/:runId`) (H6–H7); 3D, fly-to, pulsing markers, trace detail, About panel (H8–H12); delete the mock (H7–H8) |
-| **P4 Story/data** | 40 residents, zone, resources, volunteers, 20 labeled replies; drafts of `sources.md` and `video_script.md` | Verify every source and fill the emPOWER number + a confirmed harm case; 2 reply photos; architecture diagram (H6–H7); safety video (H8) |
+| **AWS** | SAM template (Lambda, HTTP API, 8 tables, bucket, map key, scoped Bedrock + Location IAM, 1-minute schedule), `amplify.yml`, deploy + smoke-test steps in README | Credentials, Bedrock model access, first `sam deploy`, Amplify app, then the README smoke test (incl. `/plans`) and `eval_replies.py` |
+| **P2 Backend** | Every §8 route: reset, outages, check-ins, inbound (+ photo to S3), clock, dashboard (with plan), messages, traces, plans, approve, stop done, runs; `store`, `geo`, `triage`, `escalation`, `location` (+ straight-line fallback), scheduled check | Real-AWS check; CORS and map-key referer lock-down |
+| **P3 AI** | `converse()` + trace rows, Jobs 1–5 with prompts (Job 5: tool-use agent, rules checked in code, greedy fallback), privacy by construction for every SMS, eval script | Run the eval on real Bedrock (18/20) and time the agent (< ~20 s); Guardrails + name/address masking; fallback model |
+| **P1 Frontend** | Command center on the live API (action bar 1–4, Plan tab, routes on the map), timeline, phone simulator (+ Others reply), volunteer route sheet, AI Trace list, flat map; mock behind `VITE_USE_MOCK`; `/3d-test` | Delete the mock (H7–H8); 3D, fly-to, pulsing markers, trace step detail, About panel (H8–H12) |
+| **P4 Story/data** | 40 residents, zone, resources, volunteers, 20 labeled replies; drafts of `sources.md` and `video_script.md`; `architecture.svg` | Verify every source and fill the emPOWER number + a confirmed harm case; 2 reply photos; record the safety video (H7–H8) |
 
 ---
 
@@ -45,7 +46,7 @@ Phases and gates from [PLAN.md §13](PLAN.md#13-timeline-18-build-hours). H0 is 
 | H0–H1 | Deployed URL returns a Bedrock reply; 3D path chosen (Amazon or fallback) | 🔄 in progress: code done, deploy blocked on credentials | |
 | H1–H4 | Each part works alone | 🔄 in progress: code done and tested offline; real-AWS check blocked on credentials | |
 | H4–H6 | Replies flow into the queue and onto the map | 🔄 in progress: code done and tested offline; real-AWS check blocked on credentials | |
-| H6–H7 | Plan renders | ⬜ not started | |
+| H6–H7 | Plan renders | 🔄 in progress: code done and tested offline; real-AWS check blocked on credentials | |
 | H7–H8 | Golden path green, or cut (safety video recorded) | ⬜ not started | |
 | H8–H12 | SHOULD tier done | ⬜ not started | |
 | H12–H14 | Green or harden | ⬜ not started | |
@@ -68,7 +69,7 @@ From [PLAN.md §11](PLAN.md#11-scope-tiers). Tick items as they are finished.
 - [ ] Job 1: check-ins sent (shown in the phone simulator) (done; real-Bedrock check pending)
 - [ ] Job 2: text replies → assessment → Job 3: score and "why" in the queue (done; real-Bedrock check and eval pending)
 - [ ] Timeline bar (forward only: play and jump buttons, counters, event markers) plus escalation L1 to L3 (Job 4) (done; real-Bedrock check pending)
-- [ ] Job 5: agent plan → routes on the map → Approve → volunteer view
+- [ ] Job 5: agent plan → routes on the map → Approve → volunteer view (done; real Bedrock + Location check pending)
 - [ ] AI Trace drawer (list done; step-by-step detail in H8–H12)
 - [ ] Deployed: Amplify URL plus the SAM stack (template ready; blocked on credentials)
 
@@ -137,6 +138,25 @@ Newest entry on top. Template:
 **Next steps:** (who does what next)
 - ...
 ```
+
+### 2026-10-23 · H6–H7 · Plan renders (offline)
+**By:** Claude session · **Branch/PR:** [`claude/focused-einstein-cqibah`](https://github.com/harbul/Spartan-hack/compare/main...neels22:Spartan-hack:claude/focused-einstein-cqibah) · Plan: capacity handling and the diagram format decided by the team before starting
+**Done:**
+- P2: [`location.py`](../backend/app/location.py) OptimizeWaypoints + CalculateRoutes with a straight-line fallback; IAM for both; `POST /plans`, `/plans/{id}/approve`, `/runs/{id}/stops/{rid}/done`, `GET /runs/{id}` (+ volunteer and stop details); `/dashboard` returns the latest plan.
+- P3: Job 5 [`agent.py`](../backend/app/agent.py) Converse tool-use loop (12 turns, 20 s budget) with [`tools.py`](../backend/app/tools.py): five tools, `submit_plan` checks every §4 rule in code and returns problems to the agent, greedy fallback planner; `planner.md` prompt.
+- P1: Plan tab (runs, stops, reasons, next wave, Approve), routes on the map (dashed draft, solid approved), action bar steps 3–4, volunteer route sheet `/run/:runId`, "Others reply (demo)" on the phone simulator; the mock plans, approves and serves a route sheet too.
+- P4: [`architecture.svg`](architecture.svg) for the video; README smoke test and video script extended.
+- Checks: `pytest` 103 passed (new: location, tools, agent, plan flow), `compileall`, `cfn-lint`, `sam build`, `npm run build`. In Chromium against the real API (in-memory tables, greedy planner standing in for Bedrock, Location unavailable): heroes + Others reply (33) → +3 h → plan 13 stops / 3 volunteers → approve → route sheet → mark done; and in mock mode.
+**Not done / cut:**
+- Nothing on real AWS yet: the agent's real behavior and timing, real road routes.
+- Trace drawer shows each agent turn and its tool names; tool outputs per step stay for H8–H12.
+**Decisions made:**
+- See the Decisions log entries dated 2026-10-23 (H6–H7).
+**Blockers / risks:**
+- Credentials, as before. First real `/plans` call is the riskiest step: agent time vs the 30 s API limit (falls back to greedy at 20 s, visible in the summary).
+**Next steps:**
+- When credentials arrive: README smoke test end to end, `eval_replies.py`, then three clean browser runs on the deployed URL (H7–H8 gate) and record the safety video.
+- H7–H8: delete the mock once the gate is met; P4 verify sources, make the 2 photos.
 
 ### 2026-10-23 · H4–H6 · Replies flow into the queue and onto the map (offline)
 **By:** Claude session · **Branch/PR:** [`claude/focused-einstein-cqibah`](https://github.com/harbul/Spartan-hack/compare/main...neels22:Spartan-hack:claude/focused-einstein-cqibah) · Plan: supply-hours fallback and Rosa's margin decided by the team before starting
@@ -268,6 +288,13 @@ Decisions that change or clarify the plan. If one changes the plan, `PLAN.md` is
 | 2026-10-23 | Frontend API client added: `api/client.ts` (fetch helpers, `useDashboard()`), `api/seed.ts`, `api/mock.ts` (closes the API-client question) | One hook to switch from mock to `/dashboard` in H4–H6 without touching the screens | Claude session |
 | 2026-10-23 | `BedrockBadge.tsx` and `status.ts` live in `components/`; top bar and action bar stay in `CommandCenter.tsx` (closes the shared-UI question) | The badge and colors are used by several panels; the bars by one page | Claude session |
 | 2026-10-23 | Vite may read `../data` (`server.fs.allow`) and the app imports the seed JSON | §9.2 says quick replies come from `data/test_replies.json`; one source of truth | Claude session |
+| 2026-10-23 | **Capacity (closes "36 silent residents"):** "Others reply (demo)" on the phone simulator sends everyone else's reply through the real `/inbound` (Lupe, res-025, res-036 stay silent); plans list what can't fit as `Plan.uncovered` ("next wave") | 3 volunteers × 6 stops = 18; without it ~40 cases were ≥ 60. Simulated residents, real processing | Team |
+| 2026-10-23 | `submit_plan` enforces the §4 rules in code (6 stops, Critical first, seats for rides, real open cases, no uncovered case while room is left) and returns problems to the agent | The agent decides who and why; the code guarantees the rules | Claude session |
+| 2026-10-23 | Agent: 12 turns and a 20 s budget, then the greedy planner; the summary says why. A missing model ID still raises (503) | Stays under the 30 s API limit; a setup error is never hidden behind a fallback | Claude session |
+| 2026-10-23 | `optimize_run` takes `volunteer_id` + `resident_ids` (not raw coordinates) and its Location results are cached for `submit_plan` | Easier for the model to call correctly; no double Location calls | Claude session |
+| 2026-10-23 | Location failures fall back to nearest-neighbour order and straight lines at 30 km/h, noted in the plan summary and the Plan tab | §16; the demo keeps working and nobody mistakes a straight line for a road | Claude session |
+| 2026-10-23 | Contract: `Stop.action` = cooler / battery / door_knock / ride (no longer PROPOSED); `Plan.uncovered`; `RunResponse.volunteer` + `stops_detail` | Next wave visible; the route sheet needs one call | Claude session |
+| 2026-10-23 | Architecture diagram is `docs/architecture.svg` (replaces the planned `.png`) | Team choice: text-based, versioned, readable at 1080p | Team |
 | 2026-10-23 | **Triage uses `supply_hours_left`, else `baseline_backup_hours`**, both counted down to virtual now (closes the supply-fallback question) | Team decision before H4–H6; keeps the §3 story (Rosa, Harold High; Lupe Critical) | Team |
 | 2026-10-23 | Rosa lives alone (closes the "Rosa on the line" question) | Team asked for margin; lowering her backup hours can't change her score (12 h is already under the 14 h outage), living alone does: 65 at distress 0, 70 at 1 | Team + Claude session |
 | 2026-10-23 | A reply with status `unclear` sets the case to `needs_help` with review, not back to awaiting | Someone answered, so a person should look; escalating them as silent would be wrong | Claude session |
@@ -298,7 +325,7 @@ From [PLAN.md §18](PLAN.md#18-pre-event-checklist-and-open-questions):
 
 From the repo setup (2026-10-23):
 
-- [ ] **PROPOSED shapes** in `schemas.py` / `types.ts`: `ScoreBreakdown` field names, `Escalation`, `ToolCall`, `DashboardCase.resident`, `Outage.status`, `Stop.action` values, `Volunteer.capacity` meaning, `Resource.offers`. P1, P2, P3 confirm at H0.
+- [ ] **PROPOSED shapes** in `schemas.py` / `types.ts`: `ScoreBreakdown` field names, `Escalation`, `ToolCall`, `DashboardCase.resident`, `Outage.status`, `Volunteer.capacity` meaning (now used as ride seats), `Resource.offers`. P1, P2, P3 confirm. (`Stop.action` confirmed in H6–H7.)
 - [ ] **Test reply photos:** `test_replies.json` points tr-02 to `data/photos/minh_gauge.jpg` and tr-18 to `data/photos/wheelchair_battery.jpg`. Someone takes or makes the 2 photos (under 1 MB each); OK to commit them as binaries? (P4, P3)
 - [ ] **Lockfile:** `frontend/package-lock.json` is committed so all four laptops and Amplify install the same versions. Keep it? (P1, P2)
 
@@ -307,7 +334,7 @@ From H0–H1 (2026-10-23):
 - [ ] **Amplify branch for the gate:** Amplify deploys `main` (§6). Connect this branch too for the gate check, or merge first? (P2)
 - [ ] **Lock down public surfaces:** CORS (`*` in FastAPI and the HTTP API) and the map key's allowed referers should name the Amplify URL and localhost once the Amplify URL exists. (P2)
 - [ ] **3D buildings height:** the extrusion reads the `height` property of the `buildings` tile layer, with 6 m if it's missing. Check on `/3d-test` with the key. If all buildings look the same height, drop buildings and keep terrain. (P1)
-- [ ] **36 silent residents in the golden path:** only the 4 heroes reply, so the other 36 also escalate to L3 (about 150 Bedrock calls on the first +3 h, 36 door-knocks on the map, and a +3 h jump may near the 30 s API limit). Proposal: a phone-simulator button "Others reply" that sends the remaining test replies and "1"s through the real `/inbound` before the clock moves (real pipeline, simulated residents), leaving only Lupe and 2–3 others silent. (P1, P4, P3)
+- [ ] **"Others reply" on camera:** show the button in the video (honest: simulated residents, real Bedrock) or run it before recording? It sends ~33 replies (~33 Job 2 + Job 3 calls, about a minute). (P4, P1)
 - [ ] **Sources to verify:** open every link in `docs/sources.md`, read the Santa Clara County emPOWER number off the live map, and find a confirmed outage-related harm (the 2019 El Dorado County case was ruled not outage-caused). (P4)
 - [ ] **`/demo/reset` response:** returns `null` (§8 says n/a). Fine for the Reset button? (P1, P2)
 - [ ] **Worker file type on Amplify:** the MapLibre worker ships as `assets/maplibre-gl-worker-*.mjs`. If the deployed map is blank with a MIME-type error, add a `Content-Type: text/javascript` custom header for `*.mjs`. (P1, P2)
