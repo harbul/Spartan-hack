@@ -1,0 +1,7 @@
+# Local-only tools: tests and a dev server. Not packaged into the Lambda.
+# Install with: pip install -r requirements-dev.txt
+# Owner: P2 (Backend and infra).
+-r requirements.txt
+pytest>=9.1,<10
+httpx>=0.28,<1  # FastAPI TestClient
+uvicorn>=0.54,<1  # uvicorn app.main:app --reload --port 8000

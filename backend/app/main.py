@@ -7,9 +7,12 @@ Implements: PLAN.md §8 (API contract), §6 (Lambda + Mangum).
 Owner: P2 (Backend and infra).
 """
 
-from fastapi import FastAPI
+from botocore.exceptions import BotoCoreError, ClientError
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from mangum import Mangum
 
+from app import bedrock
 from app.schemas import (
     CaseResponse,
     CheckinsResponse,
@@ -27,7 +30,61 @@ from app.schemas import (
 )
 
 app = FastAPI(title="StillHere API")
-# TODO(P2, §6): CORS for the Amplify origin and localhost:5173.
+
+# Local runs (uvicorn). In Lambda, API Gateway answers CORS itself (infra/template.yaml).
+# TODO(P2, §6): restrict both to the Amplify origin and localhost:5173.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["content-type"],
+)
+
+
+@app.get("/health")
+def health() -> dict:
+    return {"ok": True}
+
+
+# --- Skeleton / debug route (H0-H1 gate). The real §8 routes replace it; delete then.
+
+
+@app.get("/hello-bedrock")
+def hello_bedrock() -> dict:
+    """One real Bedrock call through converse(), to prove the deploy reaches the model."""
+    try:
+        result = bedrock.converse(
+            job="hello",
+            system="You are the AI inside StillHere, an emergency response command center.",
+            messages=[
+                {
+                    "role": "user",
+                    "content": [{"text": "In one short sentence, say hello to the StillHere team."}],
+                }
+            ],
+            max_tokens=100,
+        )
+    except bedrock.BedrockNotConfigured as err:
+        raise HTTPException(status_code=503, detail=str(err)) from err
+    except ClientError as err:
+        # e.g. AccessDeniedException: model access not granted, or a wrong model ID.
+        error = err.response.get("Error", {})
+        raise HTTPException(
+            status_code=502, detail=f"Bedrock {error.get('Code')}: {error.get('Message')}"
+        ) from err
+    except BotoCoreError as err:
+        # e.g. no AWS credentials or region locally.
+        raise HTTPException(status_code=502, detail=f"Bedrock: {err}") from err
+    return {
+        "reply": result.text,
+        "model_id": result.model_id,
+        "latency_ms": result.latency_ms,
+        "input_tokens": result.input_tokens,
+        "output_tokens": result.output_tokens,
+    }
+
+
+# --- §8 API contract
 
 
 @app.post("/demo/reset")

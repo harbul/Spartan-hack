@@ -1,5 +1,6 @@
 # StillHere SAM template: Lambda (FastAPI + Mangum), HTTP API, DynamoDB tables,
-# photo bucket, EventBridge Scheduler escalation check, IAM.
+# photo bucket, EventBridge Scheduler escalation check (off until H4-H6), IAM,
+# and the browser map API key.
 # Deploy from infra/: `sam build && sam deploy --guided`.
 # Amplify Hosting (frontend) is connected to the repo in the console, not here.
 #
@@ -32,6 +33,9 @@ Parameters:
     Default: ""
     NoEcho: true
     Description: Optional. Amazon Location API key for Routes; leave empty to use the Lambda role.
+
+Conditions:
+  HasFallbackModel: !Not [!Equals [!Ref BedrockFallbackModelId, ""]]
 
 Globals:
   Function:
@@ -79,10 +83,12 @@ Resources:
             ApiId: !Ref HttpApi
             Path: /{proxy+}
             Method: ANY
-        EscalationCheck:
-          Type: ScheduleV2 # EventBridge Scheduler
-          Properties:
-            ScheduleExpression: rate(1 minute)
+        # TODO(P2, §5): turn on with the escalation check. Until main.handler routes
+        # scheduled events, this would fail every minute.
+        # EscalationCheck:
+        #   Type: ScheduleV2 # EventBridge Scheduler
+        #   Properties:
+        #     ScheduleExpression: rate(1 minute)
       Policies:
         - DynamoDBCrudPolicy: { TableName: !Ref ResidentsTable }
         - DynamoDBCrudPolicy: { TableName: !Ref OutagesTable }
@@ -94,17 +100,45 @@ Resources:
         - DynamoDBCrudPolicy: { TableName: !Ref ConfigTable }
         - S3CrudPolicy: { BucketName: !Ref PhotosBucket }
         - Statement:
-            - Effect: Allow
-              Action: # TODO(P2/P3): scope Resource to the model and guardrail ARNs
+            # Converse needs bedrock:InvokeModel, only on the configured model IDs.
+            # Each ID may be a cross-region inference profile (us.*, global.*) or a plain model ID.
+            - Sid: BedrockConfiguredModels
+              Effect: Allow
+              Action:
                 - bedrock:InvokeModel
                 - bedrock:InvokeModelWithResponseStream
-                - bedrock:ApplyGuardrail
-              Resource: "*"
-            - Effect: Allow
+              Resource:
+                - !Sub arn:${AWS::Partition}:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/${BedrockFastModelId}
+                - !Sub arn:${AWS::Partition}:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/${BedrockStrongModelId}
+                - !If
+                  - HasFallbackModel
+                  - !Sub arn:${AWS::Partition}:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/${BedrockFallbackModelId}
+                  - !Ref AWS::NoValue
+                - !Sub arn:${AWS::Partition}:bedrock:${AWS::Region}::foundation-model/${BedrockFastModelId}
+                - !Sub arn:${AWS::Partition}:bedrock:${AWS::Region}::foundation-model/${BedrockStrongModelId}
+                - !If
+                  - HasFallbackModel
+                  - !Sub arn:${AWS::Partition}:bedrock:${AWS::Region}::foundation-model/${BedrockFallbackModelId}
+                  - !Ref AWS::NoValue
+            # A cross-region profile routes to the foundation model in several regions;
+            # allow that only when the call comes through one of our profiles.
+            - Sid: BedrockModelsBehindOurProfiles
+              Effect: Allow
               Action:
-                - geo-routes:OptimizeWaypoints
-                - geo-routes:CalculateRoutes
-              Resource: "*"
+                - bedrock:InvokeModel
+                - bedrock:InvokeModelWithResponseStream
+              Resource: !Sub arn:${AWS::Partition}:bedrock:*::foundation-model/*
+              Condition:
+                StringEquals:
+                  bedrock:InferenceProfileArn:
+                    - !Sub arn:${AWS::Partition}:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/${BedrockFastModelId}
+                    - !Sub arn:${AWS::Partition}:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/${BedrockStrongModelId}
+                    - !If
+                      - HasFallbackModel
+                      - !Sub arn:${AWS::Partition}:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/${BedrockFallbackModelId}
+                      - !Ref AWS::NoValue
+            # TODO(P3, §4 Job 6): bedrock:ApplyGuardrail on the guardrail ARN.
+            # TODO(P2, H6-H7): geo-routes:OptimizeWaypoints / CalculateRoutes for location.py.
 
   # --- DynamoDB tables (PLAN.md §7), all on-demand ---------------------------
 
@@ -189,9 +223,21 @@ Resources:
         RestrictPublicBuckets: true
 
   # --- Amazon Location ---------------------------------------------------------
-  # TODO(P1/P2, hour 0): the browser map key (VITE_LOCATION_API_KEY) can be an
-  # AWS::Location::APIKey here or made in the console. Confirm satellite style,
-  # 3D terrain and OptimizeWaypoints in our region first (PLAN.md §6, §18).
+  # Browser map key (VITE_LOCATION_API_KEY): map tiles only, in this region.
+  # CloudFormation can't output the key value; get it with the command in the
+  # MapsApiKeyName output. The key ships in the frontend bundle, so it is public.
+  # TODO(P2): add Restrictions.AllowReferers for the Amplify URL and localhost.
+  # TODO(P2, H6-H7): Routes (OptimizeWaypoints) for the backend uses the Lambda role.
+  MapsApiKey:
+    Type: AWS::Location::APIKey
+    Properties:
+      KeyName: !Sub ${AWS::StackName}-maps
+      Description: StillHere browser map (Maps API tiles, styles, glyphs, sprites)
+      NoExpiry: true
+      Restrictions:
+        AllowActions: ["geo-maps:*"]
+        AllowResources:
+          - !Sub arn:${AWS::Partition}:geo-maps:${AWS::Region}::provider/default
 
   # --- Bedrock Guardrail -------------------------------------------------------
   # TODO(P3): AWS::Bedrock::Guardrail (denied topic: dosing and treatment advice;
@@ -202,5 +248,10 @@ Outputs:
   ApiUrl:
     Description: Base URL for VITE_API_URL
     Value: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com"
+  MapsApiKeyName:
+    Description: >-
+      VITE_LOCATION_API_KEY value: aws location describe-key --key-name <this>
+      --query Key --output text
+    Value: !Sub ${AWS::StackName}-maps
   PhotosBucketName:
     Value: !Ref PhotosBucket

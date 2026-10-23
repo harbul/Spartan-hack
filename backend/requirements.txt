@@ -4,4 +4,3 @@ fastapi>=0.161,<1
 mangum>=0.22,<1
 boto3>=1.43,<2
 pydantic>=2.14,<3
-pytest>=9.1,<10
