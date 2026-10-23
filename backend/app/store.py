@@ -13,8 +13,8 @@ Owner: P2 (Backend and infra).
 
 import json
 import os
+import threading
 from decimal import Decimal
-from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -45,17 +45,22 @@ class StoreNotConfigured(RuntimeError):
 # --- plumbing -----------------------------------------------------------------
 
 
-@lru_cache(maxsize=1)
-def _dynamodb():
-    return boto3.resource("dynamodb", region_name=os.environ.get("AWS_REGION") or None)
+_local = threading.local()
 
 
-@lru_cache(maxsize=None)
 def _table(env_name: str):
+    """The table named by `env_name`. boto3 resources aren't thread-safe (Job 1 writes
+    traces from a thread pool), so each thread gets its own."""
     name = os.environ.get(env_name, "").strip()
     if not name:
         raise StoreNotConfigured(f"{env_name} is not set (see .env.example)")
-    return _dynamodb().Table(name)
+    if not hasattr(_local, "tables"):
+        session = boto3.session.Session()
+        _local.dynamodb = session.resource("dynamodb", region_name=os.environ.get("AWS_REGION") or None)
+        _local.tables = {}
+    if name not in _local.tables:
+        _local.tables[name] = _local.dynamodb.Table(name)
+    return _local.tables[name]
 
 
 def _to_item(data: BaseModel | dict[str, Any]) -> dict[str, Any]:

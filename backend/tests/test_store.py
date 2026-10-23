@@ -72,7 +72,6 @@ def test_floats_round_trip_through_decimal(tables):
 
 
 def test_missing_table_env_is_a_clear_503(monkeypatch):
-    store._table.cache_clear()
     monkeypatch.delenv("RESIDENTS_TABLE", raising=False)
     response = client.post("/outages", json=outage_body(ZONE))
     assert response.status_code == 503
