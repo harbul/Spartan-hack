@@ -138,7 +138,12 @@ Resources:
                       - !Sub arn:${AWS::Partition}:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/${BedrockFallbackModelId}
                       - !Ref AWS::NoValue
             # TODO(P3, §4 Job 6): bedrock:ApplyGuardrail on the guardrail ARN.
-            # TODO(P2, H6-H7): geo-routes:OptimizeWaypoints / CalculateRoutes for location.py.
+            - Sid: AmazonLocationRoutes # location.py: stop order and road routes (Job 5)
+              Effect: Allow
+              Action:
+                - geo-routes:OptimizeWaypoints
+                - geo-routes:CalculateRoutes
+              Resource: !Sub arn:${AWS::Partition}:geo-routes:${AWS::Region}::provider/default
 
   # --- DynamoDB tables (PLAN.md §7), all on-demand ---------------------------
   # Named <stack>-<table> so local runs can use the .env.example names (stack `stillhere`).
@@ -237,7 +242,6 @@ Resources:
   # CloudFormation can't output the key value; get it with the command in the
   # MapsApiKeyName output. The key ships in the frontend bundle, so it is public.
   # TODO(P2): add Restrictions.AllowReferers for the Amplify URL and localhost.
-  # TODO(P2, H6-H7): Routes (OptimizeWaypoints) for the backend uses the Lambda role.
   MapsApiKey:
     Type: AWS::Location::APIKey
     Properties:

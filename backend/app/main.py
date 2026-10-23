@@ -17,7 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from mangum import Mangum
 
-from app import bedrock, escalation, geo, store, triage
+from app import agent, bedrock, escalation, geo, store, triage
 from app.schemas import (
     Case,
     CaseResponse,
@@ -38,6 +38,7 @@ from app.schemas import (
     PlanResponse,
     Resource,
     RunResponse,
+    RunStopDetail,
     TracesResponse,
     Volunteer,
 )
@@ -257,19 +258,74 @@ def advance_clock(body: ClockAdvanceRequest) -> ClockAdvanceResponse:
 @app.post("/plans")
 def create_plan(body: CreatePlanRequest) -> PlanResponse:
     """Draft plan from the Job 5 agent (agent.plan_dispatch)."""
-    ...
+    _outage(body.outage_id)
+    if not any(c.status in ("needs_help", "escalated", "silent") for c in store.list_cases(body.outage_id)):
+        raise HTTPException(status_code=409, detail="No open cases to plan for")
+    plan = agent.plan_dispatch(body.outage_id)
+    store.put_plan(plan)
+    stops = sum(len(r.stops) for r in plan.runs)
+    label = f"Plan drafted: {stops} stops for {len(plan.runs)} volunteers"
+    if plan.uncovered:
+        label += f", {len(plan.uncovered)} for the next wave"
+    store.add_event(Event(outage_id=plan.outage_id, ts=escalation.iso(escalation.now()), type="plan_drafted", label=label))
+    return PlanResponse(plan=plan)
 
 
 @app.post("/plans/{plan_id}/approve")
 def approve_plan(plan_id: str) -> PlanResponse:
     """Human approval; cases in the plan become dispatched."""
-    ...
+    plan = store.get_plan(plan_id)
+    if not plan:
+        raise HTTPException(status_code=404, detail=f"No plan {plan_id}")
+    if plan.status == "approved":
+        return PlanResponse(plan=plan)
+    plan.status = "approved"
+    store.put_plan(plan)
+    for run in plan.runs:
+        for stop in run.stops:
+            case = store.get_case(plan.outage_id, stop.resident_id)
+            if case and case.status != "resolved":
+                case.status = "dispatched"
+                store.put_case(case)
+    stops = sum(len(r.stops) for r in plan.runs)
+    store.add_event(
+        Event(
+            outage_id=plan.outage_id,
+            ts=escalation.iso(escalation.now()),
+            type="plan_approved",
+            label=f"Plan approved: {stops} stops dispatched to {len(plan.runs)} volunteers",
+        )
+    )
+    return PlanResponse(plan=plan)
 
 
 @app.post("/runs/{run_id}/stops/{resident_id}/done")
 def mark_stop_done(run_id: str, resident_id: str) -> CaseResponse:
     """Volunteer marks a stop done; the case becomes resolved."""
-    ...
+    plan, run = _run(run_id)
+    stop = next((s for s in run.stops if s.resident_id == resident_id), None)
+    if not stop:
+        raise HTTPException(status_code=404, detail=f"{resident_id} is not a stop on {run_id}")
+    if plan.status != "approved":
+        raise HTTPException(status_code=409, detail="The plan is not approved yet")
+    case = store.get_case(plan.outage_id, resident_id)
+    resident = store.get_resident(resident_id)
+    if case.status != "resolved":
+        before = case.status
+        case.status = "resolved"
+        store.put_case(case)
+        store.add_event(
+            Event(
+                outage_id=plan.outage_id,
+                ts=escalation.iso(escalation.now()),
+                type="stop_done",
+                label=f"{resident.name}: {stop.action.replace('_', ' ')} done",
+                resident_id=resident_id,
+                from_status=before,
+                to_status="resolved",
+            )
+        )
+    return CaseResponse(case=case)
 
 
 @app.get("/dashboard")
@@ -295,7 +351,7 @@ def dashboard(outage_id: str | None = None) -> DashboardResponse:
         counts=_counts(cases),
         cases=cases,
         events=store.list_events(outage.outage_id) if outage else [],
-        plan=None,  # TODO(P2, H6-H7): the outage's latest plan
+        plan=store.latest_plan(outage.outage_id) if outage else None,
         resources=resources,
         volunteers=volunteers,
     )
@@ -313,8 +369,26 @@ def list_traces(limit: int = 50) -> TracesResponse:
 
 @app.get("/runs/{run_id}")
 def get_run(run_id: str) -> RunResponse:
-    """Volunteer route sheet view."""
-    ...
+    """Volunteer route sheet view: the run, its volunteer, and each stop's resident and status."""
+    plan, run = _run(run_id)
+    residents = {r.resident_id: r for r in store.list_residents()}
+    cases = {c.resident_id: c for c in store.list_cases(plan.outage_id)}
+    volunteer = next(
+        (Volunteer.model_validate(v) for v in store.get_config("volunteers") or [] if v["volunteer_id"] == run.volunteer),
+        None,
+    )
+    details = [
+        RunStopDetail(
+            resident_id=s.resident_id,
+            name=residents[s.resident_id].name,
+            address=residents[s.resident_id].address,
+            lat=residents[s.resident_id].lat,
+            lng=residents[s.resident_id].lng,
+            status=cases[s.resident_id].status,
+        )
+        for s in run.stops
+    ]
+    return RunResponse(run=run, volunteer=volunteer, stops_detail=details)
 
 
 # --- helpers ------------------------------------------------------------------
@@ -325,6 +399,13 @@ def _outage(outage_id: str) -> Outage:
     if not outage:
         raise HTTPException(status_code=404, detail=f"No outage {outage_id}")
     return outage
+
+
+def _run(run_id: str):
+    found = store.find_run(run_id)
+    if not found:
+        raise HTTPException(status_code=404, detail=f"No run {run_id}")
+    return found
 
 
 def _decode_image(image_b64: str | None) -> bytes | None:

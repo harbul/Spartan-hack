@@ -8,7 +8,7 @@
  *
  * MUST tier (now): flat map, zone, resident and resource markers, click to select.
  * Without a Location key it draws the same layers on a plain background.
- * TODO(P1, §6, §9.1 SHOULD): 3D (approach chosen on /3d-test), fly-to, routes layer.
+ * TODO(P1, §6, §9.1 SHOULD): 3D (approach chosen on /3d-test), fly-to.
  *
  * Data: /dashboard (outage, cases, resources, volunteers, plan).
  * Implements: PLAN.md §6 (3D map), §9.1 center. Owner: P1 (Frontend and UX).
@@ -19,6 +19,7 @@ import type { DashboardResponse } from '../../api/types';
 import { EAST_SAN_JOSE, amazonStyleUrl, hasLocationKey, withLocationKey } from './amazonStyle';
 import { addResidentsLayer, RESIDENTS_LAYER } from './layers/residentsLayer';
 import { addResourcesLayer } from './layers/resourcesLayer';
+import { addRoutesLayer } from './layers/routesLayer';
 import { addZoneLayer } from './layers/zoneLayer';
 import { maplibregl } from './maplibre';
 
@@ -82,6 +83,7 @@ export default function IncidentMap({ dashboard, selectedId, onSelect }: Props) 
     if (dashboard.outage) addZoneLayer(map, dashboard.outage);
     addResourcesLayer(map, dashboard);
     addResidentsLayer(map, dashboard.cases, selectedId);
+    addRoutesLayer(map, dashboard.plan, 'residents-selected'); // under the markers
   }, [map, dashboard, selectedId]);
 
   return (

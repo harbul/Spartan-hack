@@ -31,7 +31,7 @@ const TABS: { id: Tab; label: string }[] = [
 ];
 
 export default function CommandCenter() {
-  const { data, error, busy, advance, reset, loadZone, sendCheckins } = useDashboard();
+  const { data, error, busy, advance, reset, loadZone, sendCheckins, planDispatch, approvePlan } = useDashboard();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>('resident');
   const messages = useMessages(selectedId, data);
@@ -46,11 +46,17 @@ export default function CommandCenter() {
   }
   const selected = data.cases.find((c) => c.resident_id === selectedId);
   const toContact = data.cases.filter((c) => c.status === 'not_contacted').length;
+  const open = data.cases.filter((c) => ['needs_help', 'escalated', 'silent'].includes(c.status)).length;
+  const draft = data.plan?.status === 'draft';
+  const showPlan = (action: () => void) => () => {
+    action();
+    setTab('plan');
+  };
   const steps = [
     { label: 'Load outage zone', onClick: loadZone, enabled: !data.outage },
     { label: `Send check-ins${toContact ? ` (${toContact})` : ''}`, onClick: sendCheckins, enabled: toContact > 0 },
-    { label: 'Plan dispatch', onClick: () => {}, enabled: false }, // TODO(P1, H6-H7): POST /plans
-    { label: 'Approve plan', onClick: () => {}, enabled: false }, // TODO(P1, H6-H7): POST /plans/{id}/approve
+    { label: 'Plan dispatch', onClick: showPlan(planDispatch), enabled: open > 0 && !draft },
+    { label: 'Approve plan', onClick: showPlan(approvePlan), enabled: draft },
   ];
 
   const select = (residentId: string) => {
@@ -105,7 +111,16 @@ export default function CommandCenter() {
           <div className="min-h-0 flex-1 overflow-y-auto">
             {tab === 'resident' && <ResidentPanel dcase={selected} messages={messages} />}
             {tab === 'trace' && <TraceDrawer traces={traces} />}
-            {tab === 'plan' && <PlanPanel />}
+            {tab === 'plan' && (
+              <PlanPanel
+                plan={data.plan}
+                cases={data.cases}
+                volunteers={data.volunteers}
+                busy={!!busy}
+                onApprove={approvePlan}
+                onSelect={select}
+              />
+            )}
           </div>
         </aside>
       </div>

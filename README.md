@@ -14,6 +14,7 @@ Spartan-hack/
 ├── docs/
 │   ├── PLAN.md               the build plan
 │   ├── PROGRESS.md           phase status, scope tracker, decisions, open questions
+│   ├── architecture.svg      architecture diagram for the video (§6)
 │   ├── video_script.md       5-minute video script (§14)
 │   ├── sources.md            cited stats for the persona (§18)
 │   └── submission.md         video link, contacts, final R1–R18 tick (§1.1)
@@ -148,6 +149,18 @@ curl $API/dashboard                                       # counts, cases, event
 python tests/eval_replies.py                              # needs 18/20 and no privacy hits
 ```
 
-Or run it in the browser: `/` → Reset demo → 1. Load outage zone → 2. Send check-ins, then send the hero quick replies from `/phone` and press +3 h. Set `VITE_USE_MOCK=true` to work on the screens without an API.
+H6–H7, the dispatch plan (after most residents have replied, see "Others reply" below):
+
+```bash
+curl -X POST $API/plans -H 'content-type: application/json' -d "{\"outage_id\":\"$OUTAGE\"}"  # Job 5 agent; under ~20 s
+PLAN=<plan_id>; RUN=<a run_id from the plan>
+curl -X POST $API/plans/$PLAN/approve                     # cases become dispatched
+curl $API/runs/$RUN                                       # the volunteer's route sheet
+curl -X POST $API/runs/$RUN/stops/res-005/done            # Lupe's door-knock done
+```
+
+The AI Trace tab should show one Job 5 row per agent turn. If the plan summary says "Fallback plan" or "straight lines", the agent or Amazon Location did not finish; the log says why.
+
+Or run it in the browser: `/` → Reset demo → 1. Load outage zone → 2. Send check-ins; on `/phone` send the 4 hero quick replies, then **Others reply (demo)** (everyone else answers through the real `/inbound`; Lupe and 2 more stay silent); back on `/`, +3 h → 3. Plan dispatch → 4. Approve plan → open a route sheet from the Plan tab and mark a stop done. Set `VITE_USE_MOCK=true` to work on the screens without an API.
 
 Frontend: Amplify Hosting builds `frontend/` with [`amplify.yml`](amplify.yml). Connect the repo as a monorepo with root `frontend`, set `VITE_API_URL`, `VITE_LOCATION_API_KEY` and `VITE_LOCATION_REGION`, and add the SPA rewrite (`</^[^.]+$|\.(?!(css|gif|ico|jpg|js|mjs|png|txt|svg|woff|woff2|ttf|map|json|webp)$)([^.]+$)/>` → `/index.html`, 200) so `/phone` and `/run/:runId` deep links work.

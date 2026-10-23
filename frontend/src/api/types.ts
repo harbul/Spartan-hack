@@ -45,6 +45,7 @@ export type EventType =
   | 'plan_approved'
   | 'stop_done';
 export type ResourceType = 'resource_center' | 'pharmacy';
+export type StopAction = 'cooler' | 'battery' | 'door_knock' | 'ride';
 export type BedrockJob = 'checkin' | 'assess' | 'explain' | 'escalate' | 'planner';
 
 /** ISO 8601 string in UTC (virtual time where noted). */
@@ -147,7 +148,7 @@ export interface Message {
 
 export interface Stop {
   resident_id: string;
-  action: string; // PROPOSED values: 'cooler' | 'battery' | 'door_knock' | 'ride'
+  action: StopAction;
   items: string[];
   reason: string;
   eta: Timestamp | null;
@@ -169,6 +170,7 @@ export interface Plan {
   runs: Run[];
   summary: string;
   trace_id: string | null;
+  uncovered: string[]; // open cases with priority >= 60 that didn't fit: "next wave"
 }
 
 /** One tool call inside a trace. PROPOSED shape. */
@@ -306,6 +308,17 @@ export interface TracesResponse {
   traces: Trace[];
 }
 
+export interface RunStopDetail {
+  resident_id: string;
+  name: string;
+  address: string;
+  lat: number;
+  lng: number;
+  status: CaseStatus;
+}
+
 export interface RunResponse {
   run: Run;
+  volunteer: Volunteer | null;
+  stops_detail: RunStopDetail[]; // same order as run.stops
 }

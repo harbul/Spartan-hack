@@ -365,7 +365,7 @@ Spartan-hack/
 ├── docs/
 │   ├── PLAN.md               ← this file
 │   ├── PROGRESS.md           ← phase status, scope tracker, decisions, open questions
-│   ├── architecture.png
+│   ├── architecture.svg      ← diagram for the video (open in a browser for a PNG)
 │   ├── video_script.md
 │   ├── submission.md         ← video link, team contacts, R1–R18 tick list from §1.1
 │   └── sources.md            ← cited stats for the persona

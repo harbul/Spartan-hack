@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 820" width="1600" height="820" font-family="Helvetica, Arial, sans-serif">
+  <!-- StillHere architecture (PLAN.md §6). Hand-written so it is versioned and readable at 1080p in the video.
+       Owner: P4 (Story, data and video). Open in a browser and screenshot if a tool needs a PNG. -->
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#44403c"/>
+    </marker>
+    <style>
+      .box { fill: #ffffff; stroke: #a8a29e; stroke-width: 2; }
+      .title { font-size: 26px; font-weight: 700; fill: #1c1917; }
+      .sub { font-size: 19px; fill: #57534e; }
+      .why { font-size: 18px; fill: #78716c; font-style: italic; }
+      .edge { stroke: #44403c; stroke-width: 2.5; fill: none; marker-end: url(#arrow); }
+    </style>
+  </defs>
+
+  <rect width="1600" height="820" fill="#f7f4ee"/>
+  <text x="50" y="70" font-size="40" font-weight="700" fill="#1c1917">StillHere on AWS</text>
+  <text x="50" y="108" font-size="22" fill="#57534e">AI reads and explains · rules rank · humans decide</text>
+
+  <!-- Row 1: request path -->
+  <rect class="box" x="50" y="160" width="400" height="280" rx="14"/>
+  <text class="title" x="74" y="202">Web app</text>
+  <text class="sub" x="74" y="232">React + MapLibre on Amplify Hosting</text>
+  <text class="sub" x="90" y="274">• Coordinator command center</text>
+  <text class="sub" x="90" y="304">• Resident phone simulator</text>
+  <text class="sub" x="90" y="334">• Volunteer route sheet</text>
+  <text class="sub" x="74" y="372">Map tiles: Amazon Location</text>
+  <text class="why" x="74" y="416">Why: deploys on every push</text>
+
+  <rect class="box" x="510" y="230" width="220" height="140" rx="14"/>
+  <text class="title" x="532" y="272">API Gateway</text>
+  <text class="sub" x="532" y="302">HTTP API</text>
+  <text class="why" x="532" y="346">Why: one HTTPS door</text>
+
+  <rect class="box" x="790" y="200" width="340" height="240" rx="14"/>
+  <text class="title" x="814" y="242">AWS Lambda</text>
+  <text class="sub" x="814" y="272">FastAPI + Mangum (Python 3.12)</text>
+  <text class="sub" x="814" y="302">Triage score + escalation rules</text>
+  <text class="sub" x="814" y="332">Logs: Amazon CloudWatch</text>
+  <text class="why" x="814" y="384">Why: one app, no servers;</text>
+  <text class="why" x="814" y="410">deterministic rules live here</text>
+
+  <rect x="1190" y="140" width="370" height="315" rx="16" fill="#eef2ff" stroke="#4f46e5" stroke-width="4"/>
+  <text x="1214" y="182" font-size="30" font-weight="700" fill="#3730a3">Amazon Bedrock</text>
+  <text class="sub" x="1214" y="212">Converse · tool use · Guardrails</text>
+  <text class="sub" x="1214" y="252">1 Writes check-ins (3 languages)</text>
+  <text class="sub" x="1214" y="284">2 Reads replies: text + photos</text>
+  <text class="sub" x="1214" y="316">3 Explains each priority</text>
+  <text class="sub" x="1214" y="348">4 Drafts escalations</text>
+  <text class="sub" x="1214" y="380">5 Agent plans volunteer runs</text>
+  <text class="why" x="1214" y="418">Why: all the reasoning, every</text>
+  <text class="why" x="1214" y="442">call traced for the coordinator</text>
+
+  <!-- Row 2: time, state and maps -->
+  <rect class="box" x="50" y="560" width="390" height="150" rx="14"/>
+  <text class="title" x="74" y="602">EventBridge Scheduler</text>
+  <text class="sub" x="74" y="632">Every minute: silence check</text>
+  <text class="why" x="74" y="686">Why: nobody silent is forgotten</text>
+
+  <rect class="box" x="800" y="560" width="280" height="150" rx="14"/>
+  <text class="title" x="822" y="602" style="font-size:23px">Amazon DynamoDB</text>
+  <text class="sub" x="822" y="632">Cases, messages, plans,</text>
+  <text class="sub" x="822" y="658">traces, timeline events</text>
+  <text class="why" x="822" y="692">Why: serverless state</text>
+
+  <rect class="box" x="1110" y="560" width="170" height="150" rx="14"/>
+  <text class="title" x="1132" y="602" style="font-size:23px">Amazon S3</text>
+  <text class="sub" x="1132" y="632">Reply photos</text>
+
+  <rect class="box" x="1310" y="560" width="250" height="150" rx="14"/>
+  <text class="title" x="1332" y="602" style="font-size:23px">Amazon Location</text>
+  <text class="sub" x="1332" y="632">OptimizeWaypoints</text>
+  <text class="sub" x="1332" y="658">CalculateRoutes</text>
+  <text class="why" x="1332" y="692">Why: stop order, roads</text>
+
+  <!-- Edges -->
+  <path class="edge" d="M450,300 L506,300"/>
+  <path class="edge" d="M730,300 L786,300"/>
+  <path class="edge" d="M1130,300 L1186,300"/>
+  <path class="edge" d="M900,440 L900,556"/>
+  <path class="edge" d="M1040,440 L1180,556"/>
+  <path class="edge" d="M1120,440 L1420,556"/>
+  <path class="edge" d="M440,615 L786,430"/>
+  <text x="560" y="520" font-size="17" fill="#44403c" transform="rotate(-28 560 520)">invokes</text>
+
+  <text x="50" y="780" font-size="18" fill="#78716c">Every Bedrock call writes a trace (prompt with PII masked, tool calls, output, latency, tokens) shown in the app's AI Trace tab.</text>
+</svg>
