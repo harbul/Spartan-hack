@@ -3,14 +3,14 @@
  * text box, photo attach (resized under 1 MB), and quick replies from
  * data/test_replies.json. Posts to the same /inbound webhook real SMS would use.
  *
- * MOCK (H1-H4): sending adds the reply to this page only.
- * TODO(P1, H4-H6): POST /inbound {phone, text, image_b64}; thread from GET /residents/{id}/messages.
+ * With VITE_USE_MOCK=true, sending only adds the reply to this page.
  *
  * Data: GET /residents/{id}/messages, POST /inbound.
  * Implements: PLAN.md §9.2, §6 (SMS channel). Owner: P1 (Frontend and UX).
  */
+import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { mockMessages } from '../api/mock';
+import { USE_MOCK, sendInbound, useMessages } from '../api/client';
 import { residents, testReplies } from '../api/seed';
 import type { Message } from '../api/types';
 import { LANGUAGE_LABEL, clockTime } from '../components/status';
@@ -38,15 +38,33 @@ export default function Phone() {
   const [text, setText] = useState('');
   const [photo, setPhoto] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+  const queryClient = useQueryClient();
 
   const resident = residents.find((r) => r.resident_id === residentId)!;
-  const thread = [...mockMessages(residentId, 5), ...(sent[residentId] ?? [])];
+  const fromApi = useMessages(residentId).filter((m) => m.channel === 'sms'); // the resident's phone sees SMS only
+  const thread = [...fromApi, ...(sent[residentId] ?? [])];
   const quickReplies = [...testReplies].sort(
     (a, b) => Number(b.resident_id === residentId) - Number(a.resident_id === residentId),
   );
 
-  const send = () => {
-    if (!text.trim() && !photo) return;
+  const send = async () => {
+    if ((!text.trim() && !photo) || sending) return;
+    if (!USE_MOCK) {
+      setSending(true);
+      setError(null);
+      try {
+        await sendInbound({ phone: resident.phone, text: text.trim(), image_b64: photo ?? undefined });
+        setText('');
+        setPhoto(null);
+        await queryClient.invalidateQueries();
+      } catch (err) {
+        setError((err as Error).message);
+      } finally {
+        setSending(false);
+      }
+      return;
+    }
     const message: Message = {
       resident_id: residentId,
       ts: new Date().toISOString(),
@@ -107,6 +125,7 @@ export default function Phone() {
               </div>
             </li>
           ))}
+          {sending && <li className="text-center text-xs text-stone-500">Amazon Bedrock is reading the reply…</li>}
         </ol>
 
         <footer className="border-t border-stone-200 p-2">
@@ -131,7 +150,7 @@ export default function Phone() {
               placeholder="Text message"
               className="min-w-0 flex-1 rounded-full border border-stone-300 px-3 py-1.5 text-sm"
             />
-            <button onClick={send} className="rounded-full bg-blue-500 px-3 py-1.5 text-sm text-white">
+            <button onClick={send} disabled={sending} className="rounded-full bg-blue-500 px-3 py-1.5 text-sm text-white disabled:opacity-50">
               Send
             </button>
           </div>
@@ -141,8 +160,8 @@ export default function Phone() {
       <aside className="w-80">
         <h2 className="mb-1 font-semibold">Quick replies</h2>
         <p className="mb-2 text-xs text-stone-500">
-          From data/test_replies.json. This resident's replies come first. Mock: replies stay on this page until
-          /inbound is wired (H4-H6).
+          From data/test_replies.json. This resident's replies come first. Sending posts to the same /inbound webhook
+          real SMS would use{USE_MOCK && ' (mock: replies stay on this page)'}.
         </p>
         <ul className="max-h-[680px] space-y-1 overflow-y-auto text-sm">
           {quickReplies.map((r) => (
