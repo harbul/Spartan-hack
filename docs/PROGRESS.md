@@ -16,7 +16,7 @@
 ## Current status
 
 - **Current phase:** H4–H6 (replies flow into the queue and onto the map), built offline while H0–H1 waits on AWS credentials
-- **Last updated:** 2026-10-23 04:30 UTC · Claude session
+- **Last updated:** 2026-10-23 04:46 UTC · Claude session
 - **Overall health:** 🟡 code through H4–H6 is done and tested without AWS (80 tests, plus the live UI against the real API with in-memory tables and stand-in Bedrock jobs). Nothing has run on real Bedrock or DynamoDB yet (no credentials)
 - **Gates:**
   - H0–H1 "Deployed URL returns a Bedrock reply; 3D path chosen" · ⬜ not met (no AWS credentials). 3D path chosen provisionally (Amazon `Terrain3D`)
@@ -137,6 +137,18 @@ Newest entry on top. Template:
 **Next steps:** (who does what next)
 - ...
 ```
+
+### 2026-10-23 · H4–H6 · "Others reply" button
+**By:** Claude session · **Branch/PR:** `feat/others-reply`
+**Done:**
+- [`Phone.tsx`](../frontend/src/pages/Phone.tsx): "Others reply" button sends the 32 non-hero replies (tr-05 to tr-20 plus `data/crowd_replies.json`) through `/inbound`, 6 at a time, with progress ("Amazon Bedrock is reading replies… n/32"). Disabled in mock mode (the mock already includes them). Text only: the tr-18 photo file doesn't exist yet.
+- [`test_flow.py`](../backend/tests/test_flow.py): new golden-path test with the crowd: after +3 h exactly res-005, res-025, res-036, res-039 are silent, 12 escalation drafts (not ~108), 36 replies. The 4-hero test is unchanged.
+- [`video_script.md`](video_script.md): "most of the neighborhood answers too" beat and the button in the demo take.
+- Checks: `pytest` 83 passed, `npm run build` ok. In Chromium on the live API (in-memory tables, stand-in jobs): check-ins → Others reply (32/32) → 4 hero replies → +3 h gave 21 Safe, 11 Needs help, 4 Critical, 4 No reply, Lupe first in the queue.
+**Not done / cut:**
+- Not run on real Bedrock: 32 replies run Jobs 2 and 3 (~64 calls); time it at H0 and lower the parallelism if Bedrock throttles.
+**Next steps:**
+- H6–H7: Job 5 plan, routes, Approve, volunteer view.
 
 ### 2026-10-23 · H4–H6 · Real zone, stable bands, crowd replies
 **By:** Claude session · **Branch/PR:** `data/demo-seed`
@@ -339,7 +351,6 @@ From H0–H1 (2026-10-23):
 - [ ] **Amplify branch for the gate:** Amplify deploys `main` (§6). Connect this branch too for the gate check, or merge first? (P2)
 - [ ] **Lock down public surfaces:** CORS (`*` in FastAPI and the HTTP API) and the map key's allowed referers should name the Amplify URL and localhost once the Amplify URL exists. (P2)
 - [ ] **3D buildings height:** the extrusion reads the `height` property of the `buildings` tile layer, with 6 m if it's missing. Check on `/3d-test` with the key. If all buildings look the same height, drop buildings and keep terrain. (P1)
-- [ ] **"Others reply" button:** the data side of the 36-silent fix is in (`data/crowd_replies.json`; see Decisions). Still needed: a phone-simulator button that posts tr-05 to tr-20 plus every crowd reply through `/inbound` before the clock moves, so only Lupe, res-025, res-036 and res-039 stay silent (14 plan stops, ~12 Job 4 calls on +3 h). (P1, P2)
 - [ ] **Sources to verify:** open every link in `docs/sources.md`, read the Santa Clara County emPOWER number off the live map, and find a confirmed outage-related harm (the 2019 El Dorado County case was ruled not outage-caused). (P4)
 - [ ] **`/demo/reset` response:** returns `null` (§8 says n/a). Fine for the Reset button? (P1, P2)
 - [ ] **Worker file type on Amplify:** the MapLibre worker ships as `assets/maplibre-gl-worker-*.mjs`. If the deployed map is blank with a MIME-type error, add a `Content-Type: text/javascript` custom header for `*.mjs`. (P1, P2)
