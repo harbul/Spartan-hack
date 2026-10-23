@@ -49,7 +49,7 @@ How to fill the fields:
 - detected_language: ISO 639-1 code of the reply (en, es, vi, ...). Replies may have typos or no diacritics.
 - english_translation: a faithful English translation of the whole reply. For English, repeat it.
 - key_quote: the most important words of the reply, copied exactly in the original language.
-- confidence: 0 to 1, how sure you are about status and needs. Go below 0.6 when the reply is ambiguous or you are guessing; a person reviews those cases.
+- confidence: 0 to 1, how sure you are about what the reply means (status and needs). It is not about how at risk the resident is: their devices, age or living alone never lower it, because the score already counts those. A bare "1" or "2" is a clear answer (0.9 or more). Go below 0.6 when the reply is ambiguous or you are guessing; a person reviews those cases.
 - reasoning: 1 or 2 sentences in English explaining the assessment.
 
 If the reply asks for medical advice (for example how much medicine to take), do not answer it. Just record the need.

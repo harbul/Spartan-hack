@@ -48,7 +48,7 @@ def test_agent_fixes_a_rejected_plan(world, model):  # noqa: F811
     script += [
         turn(tool_use(1, "list_open_cases"), tool_use(2, "list_volunteers")),
         turn(tool_use(3, "optimize_run", {"volunteer_id": "vol-1", "resident_ids": ["res-005", "res-001", "res-002"]})),
-        turn(tool_use(4, "submit_plan", {"summary": "s", "runs": GOOD_RUNS[:1]})),  # Harold left out: rejected
+        turn(tool_use(4, "submit_plan", {"summary": "s", "runs": GOOD_RUNS[:1] + [{"volunteer_id": "vol-9", "stops": [stop("res-003", "ride")]}]})),  # unknown volunteer: rejected
         turn(tool_use(5, "submit_plan", {"summary": "All four covered.", "runs": GOOD_RUNS})),
     ]
     plan = agent.plan_dispatch("out-1")
@@ -59,7 +59,7 @@ def test_agent_fixes_a_rejected_plan(world, model):  # noqa: F811
     assert [r["toolResult"]["toolUseId"] for r in results] == ["tu-1", "tu-2"]
     assert len(results[0]["toolResult"]["content"][0]["json"]["cases"]) == 4
     rejection = seen[3][-1]["content"][0]["toolResult"]
-    assert rejection["status"] == "error" and "res-003" in " ".join(rejection["content"][0]["json"]["problems"])
+    assert rejection["status"] == "error" and "vol-9" in " ".join(rejection["content"][0]["json"]["problems"])
 
 
 def test_turn_limit_falls_back_to_greedy(world, model):  # noqa: F811
@@ -96,3 +96,41 @@ def test_a_reply_without_tools_gets_nudged(world, model):  # noqa: F811
     ]
     assert agent.plan_dispatch("out-1").summary == "ok (Routes are straight lines: Amazon Location was unavailable.)"
     assert seen[1][-1]["content"] == [{"text": "Call submit_plan with the runs."}]
+
+
+def test_a_slow_model_hits_the_hard_deadline(world, monkeypatch):  # noqa: F811
+    """On real Bedrock a turn took ~7 s and a turn that started before the budget ran past it (/plans 35 s)."""
+    import time
+
+    def slow(job, system, messages, **kwargs):
+        time.sleep(0.5)
+        return bedrock.ConverseResult("", "m", 1, 1, 1, "tool_use", turn(tool_use(1, "list_open_cases")), "tr")
+
+    monkeypatch.setattr(bedrock, "converse", slow)
+    monkeypatch.setattr(agent, "TIME_BUDGET_S", 0.2)
+    started = time.monotonic()
+    plan = agent.plan_dispatch("out-1")
+    assert time.monotonic() - started < 0.45  # did not wait for the slow turn
+    assert "time budget" in plan.summary
+
+
+def test_the_first_message_carries_the_data(world, model):  # noqa: F811
+    script, seen = model
+    script.append(turn(tool_use(1, "submit_plan", {"runs": GOOD_RUNS, "summary": "ok"})))
+    agent.plan_dispatch("out-1")
+    first = seen[0][0]["content"][0]["text"]
+    assert "res-005" in first and "vol-3" in first and "resources" in first
+
+
+def test_repair_fixes_slips_without_another_turn(world, model):  # noqa: F811
+    """Seen on real Bedrock: a resident listed twice and another one missed."""
+    script, seen = model
+    slipped = [
+        {"volunteer_id": "vol-1", "stops": [stop("res-005", "door_knock"), stop("res-001", "battery"), stop("res-005", "door_knock")]},
+        {"volunteer_id": "vol-3", "stops": [stop("res-003", "ride")]},
+    ]  # res-005 twice, res-002 missing
+    script.append(turn(tool_use(1, "submit_plan", {"summary": "Plan.", "runs": slipped})))
+    plan = agent.plan_dispatch("out-1")
+    assert len(seen) == 1  # one model turn
+    assert sorted(s.resident_id for r in plan.runs for s in r.stops) == ["res-001", "res-002", "res-003", "res-005"]
+    assert "Rules adjusted the AI plan" in plan.summary and "second stop" in plan.summary and "missed" in plan.summary

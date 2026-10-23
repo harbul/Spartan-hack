@@ -164,12 +164,12 @@ def test_checkin_facts_and_stop_line(fake_converse):
     result = bedrock.write_checkin(RESIDENTS["res-001"], OUTAGE)
     facts = json.loads(fake_converse[0]["messages"][0]["content"][0]["text"])
     assert facts == {
-        "first_name": "Minh", "language": "Vietnamese", "depends_on": "equipment",
+        "first_name": "Minh", "language": "Vietnamese", "depends_on": "thiết bị",  # in the message's language
         "power_off": "6 PM", "power_back_estimate": "8 AM",
     }
     assert result.output.endswith("Reply STOP to opt out.") and result.trace_id == "tr-1"
     bedrock.write_checkin(RESIDENTS["res-002"], OUTAGE)  # Rosa: insulin only
-    assert json.loads(fake_converse[1]["messages"][0]["content"][0]["text"])["depends_on"] == "medicine"
+    assert json.loads(fake_converse[1]["messages"][0]["content"][0]["text"])["depends_on"] == "medicina"  # Spanish
 
 
 def test_checkins_run_for_everyone(fake_converse):
@@ -375,3 +375,38 @@ def test_mask_pii_uses_the_pii_guardrail_then_the_phone_pattern(stub, monkeypatc
     assert bedrock.mask_pii("Lupe Ramírez at 12 Main St, 408 555 0105") == "{NAME} at {ADDRESS}, [phone]"
     stub.add_client_error("apply_guardrail", "ThrottlingException")
     assert bedrock.mask_pii("Lupe, +14085550105") == "Lupe, [phone]"  # guardrail down: phones still masked
+
+
+# --- Found on real AWS (2026-10-23) ---------------------------------------------------
+
+
+def test_contact_sms_gets_the_device_word_in_the_contacts_language(fake_converse):
+    lupe = RESIDENTS["res-005"]  # Spanish; daughter Carmen speaks Spanish
+    case = Case(outage_id="out-1", resident_id="res-005", status="escalated", priority=80, band="Critical",
+                last_outbound_at="2026-10-24T01:05:00Z")
+    bedrock.draft_escalation(lupe, case, 2)
+    facts = json.loads(fake_converse[0]["messages"][0]["content"][0]["text"])
+    assert facts["depends_on"] == bedrock.DEPENDS_ON_WORD[lupe.emergency_contact.language]["equipment"] == "equipo"
+
+
+@pytest.mark.parametrize(
+    "assessment_status, ok_multiplier, expected",
+    [
+        (None, 1.0, "no reply yet"),
+        ("needs_help", 1.0, "replied asking for help"),
+        ("ok", 0.2, "replied that they are OK"),
+        ("unclear", 1.0, "replied, but the reply was unclear"),
+    ],
+)
+def test_explainer_gets_a_plain_reply_status(fake_converse, assessment_status, ok_multiplier, expected):
+    from app.schemas import Assessment, ScoreBreakdown
+
+    assessment = None if assessment_status is None else Assessment(
+        status=assessment_status, needs=[], supply_hours_left=None, needs_transport=False, distress_level=0,
+        detected_language="en", english_translation="", key_quote="", confidence=0.9, reasoning="",
+    )
+    breakdown = ScoreBreakdown(device_weight=40, time_pressure=30, alone=10, silence=0, distress=0, transport=0,
+                               status_ok_multiplier=ok_multiplier, total=80 * ok_multiplier)
+    bedrock.explain_priority(breakdown, assessment, RESIDENTS["res-001"])
+    facts = json.loads(fake_converse[0]["messages"][0]["content"][0]["text"])
+    assert facts["reply_status"] == expected and "said_they_are_ok" not in facts

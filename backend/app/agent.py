@@ -7,24 +7,42 @@ Implements: PLAN.md §4 Job 5, §16 (greedy fallback planner).
 Owner: P3 (AI).
 """
 
+import json
 import logging
 import time
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeout
 from typing import Any
 
-from app import bedrock, geo, tools
+from app import bedrock, geo, store, tools
 from app.schemas import Plan
 
 log = logging.getLogger(__name__)
 MAX_TURNS = 12
-TIME_BUDGET_S = 20  # leaves room under the 30 s API limit for the greedy fallback (§17)
-START = "Plan the volunteer runs for the open cases in this outage."
+# Hard deadline for the agent. On real Bedrock a Sonnet turn takes ~7 s and a turn can't be cut short,
+# so the agent runs in a worker thread and the greedy plan (+ routes, ~3-5 s) starts on time.
+# 18 s + fallback stays under the 30 s API limit (§17); the abandoned turn finishes in the background.
+TIME_BUDGET_S = 18
+START = (
+    "Plan the volunteer runs for the open cases in this outage. The open cases, volunteers and resource "
+    "centers are below, so you can call submit_plan right away."
+)
+_POOL = ThreadPoolExecutor(max_workers=2, thread_name_prefix="planner")
 
-ITEMS = {
-    "cooler": ["cooler", "ice packs"],
-    "battery": ["charged battery pack"],
-    "door_knock": ["phone", "printed resource center info"],
-    "ride": ["seat for one"],
-}
+# What the agent needs from each open case (tools.list_open_cases has a few more fields).
+CASE_FIELDS = ("resident_id", "name", "priority", "band", "status", "needs", "needs_transport", "devices",
+               "lives_alone", "why", "lat", "lng")
+
+
+def _start_message(outage_id: str) -> str:
+    """START plus the data the first three tool calls used to fetch, saving two ~7 s turns."""
+    data = {
+        "open_cases": [{k: c[k] for k in CASE_FIELDS} for c in tools.list_open_cases(outage_id)],
+        "volunteers": tools.list_volunteers(),
+        "resources": store.get_config("resources") or [],
+    }
+    return f"{START}\n\n{json.dumps(data, ensure_ascii=False, default=str)}"
+
 
 
 def plan_dispatch(outage_id: str) -> Plan:
@@ -35,45 +53,11 @@ def plan_dispatch(outage_id: str) -> Plan:
     the plan summary says so. A missing model ID is a setup error and is raised.
     """
     started = time.monotonic()
-    messages: list[dict[str, Any]] = [{"role": "user", "content": [{"text": START}]}]
-    first_trace = None
+    future = _POOL.submit(_agent_loop, outage_id, started)
     try:
-        for _ in range(MAX_TURNS):
-            if time.monotonic() - started > TIME_BUDGET_S:
-                return greedy_plan(outage_id, f"time budget of {TIME_BUDGET_S} s reached")
-            result = bedrock.converse(
-                "planner",
-                bedrock.load_prompt("planner"),
-                messages,
-                strong=True,
-                tools=tools.AGENT_TOOLS,
-                max_tokens=2000,
-                temperature=0,
-            )
-            first_trace = first_trace or result.trace_id
-            content = result.raw["output"]["message"]["content"]
-            messages.append({"role": "assistant", "content": content})
-            uses = [block["toolUse"] for block in content if "toolUse" in block]
-            if not uses:
-                messages.append({"role": "user", "content": [{"text": "Call submit_plan with the runs."}]})
-                continue
-            results = []
-            for use in uses:
-                output = tools.run_tool(use["name"], use.get("input") or {}, outage_id)
-                if isinstance(output, Plan):
-                    output.trace_id = first_trace
-                    return output
-                results.append(
-                    {
-                        "toolResult": {
-                            "toolUseId": use["toolUseId"],
-                            "content": [{"json": output}],
-                            "status": "error" if "error" in output else "success",
-                        }
-                    }
-                )
-            messages.append({"role": "user", "content": results})
-        return greedy_plan(outage_id, f"no plan after {MAX_TURNS} turns")
+        return future.result(timeout=max(TIME_BUDGET_S - (time.monotonic() - started), 0))
+    except FutureTimeout:
+        return greedy_plan(outage_id, f"time budget of {TIME_BUDGET_S} s reached")
     except bedrock.BedrockNotConfigured:
         raise
     except Exception as err:  # noqa: BLE001  (any agent failure must still leave Dana a plan)
@@ -81,16 +65,49 @@ def plan_dispatch(outage_id: str) -> Plan:
         return greedy_plan(outage_id, f"error: {type(err).__name__}")
 
 
-def _action(case: dict[str, Any]) -> str:
-    if case["status"] in ("escalated", "silent"):
-        return "door_knock"
-    if case["needs_transport"] or "transport" in case["needs"]:
-        return "ride"
-    if "cooling_for_medication" in case["needs"]:
-        return "cooler"
-    if "power_for_device" in case["needs"]:
-        return "battery"
-    return "door_knock"
+def _agent_loop(outage_id: str, started: float) -> Plan:
+    """The tool-use loop itself, run in a worker thread by plan_dispatch()."""
+    messages: list[dict[str, Any]] = [{"role": "user", "content": [{"text": _start_message(outage_id)}]}]
+    first_trace = None
+    for _ in range(MAX_TURNS):
+        if time.monotonic() - started > TIME_BUDGET_S:
+            return greedy_plan(outage_id, f"time budget of {TIME_BUDGET_S} s reached")
+        result = bedrock.converse(
+            "planner",
+            bedrock.load_prompt("planner"),
+            messages,
+            strong=True,
+            tools=tools.AGENT_TOOLS,
+            # Forced: on real Bedrock, Sonnet wrote ~2,000 tokens of prose around the call (17-22 s);
+            # forced, the whole plan is ~1,000 tokens (~10 s). The data is in the first message.
+            tool_choice={"tool": {"name": "submit_plan"}},
+            max_tokens=4000,
+            temperature=0,
+        )
+        first_trace = first_trace or result.trace_id
+        content = result.raw["output"]["message"]["content"]
+        messages.append({"role": "assistant", "content": content})
+        uses = [block["toolUse"] for block in content if "toolUse" in block]
+        if not uses:
+            messages.append({"role": "user", "content": [{"text": "Call submit_plan with the runs."}]})
+            continue
+        results = []
+        for use in uses:
+            output = tools.run_tool(use["name"], use.get("input") or {}, outage_id)
+            if isinstance(output, Plan):
+                output.trace_id = first_trace
+                return output
+            results.append(
+                {
+                    "toolResult": {
+                        "toolUseId": use["toolUseId"],
+                        "content": [{"json": output}],
+                        "status": "error" if "error" in output else "success",
+                    }
+                }
+            )
+        messages.append({"role": "user", "content": results})
+    return greedy_plan(outage_id, f"no plan after {MAX_TURNS} turns")
 
 
 def greedy_plan(outage_id: str, reason: str = "") -> Plan:
@@ -106,7 +123,7 @@ def greedy_plan(outage_id: str, reason: str = "") -> Plan:
     for case in tools.list_open_cases(outage_id):  # highest priority first
         if not tools.must_cover(case):
             continue
-        action = _action(case)
+        action = tools.default_action(case)
         room = [vid for vid, stops in runs.items() if len(stops) < tools.MAX_STOPS]
         if action == "ride" and not any(seats[vid] for vid in room):
             action = "door_knock"  # no seat left: check on them and arrange a ride
@@ -117,8 +134,8 @@ def greedy_plan(outage_id: str, reason: str = "") -> Plan:
         vid = min(room, key=lambda v: geo.distance_km(*last[v], case["lat"], case["lng"]))
         seats[vid] -= action == "ride"
         last[vid] = (case["lat"], case["lng"])
-        why = case["why"] or f"{case['band']} priority, needs: {', '.join(case['needs'])}"
-        runs[vid].append({"resident_id": case["resident_id"], "action": action, "items": ITEMS[action], "reason": why})
+        why = tools.default_reason(case)
+        runs[vid].append({"resident_id": case["resident_id"], "action": action, "items": tools.DEFAULT_ITEMS[action], "reason": why})
     summary = "Fallback plan built in code: highest priority first, nearest volunteer with room."
     if reason:
         summary += f" (The AI planner did not finish: {reason}.)"

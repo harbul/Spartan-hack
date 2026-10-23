@@ -17,9 +17,9 @@
 
 - **Current phase:** H8–H12 (SHOULD tier) in progress, built offline. AWS credentials are here (Workshop Studio, `us-east-1` only); the H7–H8 gate now waits on the deploy, and the event account can't create IAM roles (see the AWS entry in the Phase log)
 - **Handoff:** new to the project or picking up a role? Start at **[HANDOFF.md](HANDOFF.md)**: status, the AWS critical path, and remaining work by role
-- **Last updated:** 2026-10-23 21:55 UTC · Claude session
+- **Last updated:** 2026-10-23 22:13 UTC · Claude session
 - **Overall health:** 🟡 MUST golden path and most of SHOULD are code-complete and tested without AWS (117 tests, `npm run build`, live UI against the real API with in-memory tables and stand-in Bedrock and Location). Credentials are here and pre-flighted: Bedrock (Haiku 4.5, Sonnet 4.6) and Amazon Location answer in `us-east-1`. Nothing is deployed yet: the account can't create IAM roles, so the Lambda needs a role from the organizers (`FunctionRoleArn`) or we run the backend locally (`DeployApi=false`), [AWS_SETUP.md §2](AWS_SETUP.md#2-deploy-the-stack)
-- **Real AWS, 2026-10-23 21:55 UTC:** stack `stillhere` deployed in mode C (`DeployApi=false`). The backend run locally against it passed the whole golden path on real Bedrock, DynamoDB, both guardrails and Amazon Location, and the AI eval scored **20/20 with no privacy hits**. Issues found are in the log entry below.
+- **Real AWS, 2026-10-23 21:55 UTC:** stack `stillhere` deployed in mode C (`DeployApi=false`). The backend run locally against it passed the whole golden path on real Bedrock, DynamoDB, both guardrails and Amazon Location, and the AI eval scored **20/20 with no privacy hits**. The issues it found are fixed and the rerun passed (22:13 UTC): `/plans` 15 s with the AI planner's own plan, check-ins 17 s, eval 20/20.
 - **Gates:**
   - H0–H1 "Deployed URL returns a Bedrock reply; 3D path chosen" · ⬜ not met: Bedrock answers in the event account, but nothing is deployed (the account can't create IAM roles; [AWS_SETUP.md §2](AWS_SETUP.md#2-deploy-the-stack)). 3D path chosen provisionally (Amazon `Terrain3D`, confirmed in `us-east-1`)
   - H1–H4 "Each part works alone" · 🟡 met with stubs and mocks; real-AWS check pending
@@ -140,6 +140,28 @@ Newest entry on top. Template:
 **Next steps:** (who does what next)
 - ...
 ```
+
+### 2026-10-23 · H0–H8 · Fixes for the real-AWS findings, rerun
+**By:** Claude session · **Branch/PR:** `fix/real-aws-findings`
+**Done:**
+- **`/plans` 35 s → 15 s, and the AI plan is used again** ([`agent.py`](../backend/app/agent.py), [`tools.py`](../backend/app/tools.py), `planner.md`). Causes found in the traces: the agent spent turns fetching data (~7 s each), its single plan turn wrote ~2,000 tokens of prose around the tool call and hit `max_tokens`, and the 20 s budget was only checked between turns. Now:
+  - the first message carries the open cases, volunteers and resources;
+  - `submit_plan` is forced (`toolChoice`), ~1,000 tokens, ~10 s on Sonnet 4.6; `items` are optional (standard kit per action filled in code), reasons under 15 words;
+  - the agent runs in a worker thread with a hard 18 s deadline, then the greedy plan;
+  - `repair_runs()` fixes the slips Sonnet made in 2 of 3 measured tries (a resident twice, one missed) in code and says so in the summary ("Rules adjusted the AI plan: …") instead of spending another turn. Unfixable problems still go back to the agent.
+  - Measured on the same 14 open cases: Sonnet unforced 16–22 s with prose; Haiku 4.5 8 s but planned only 6–12 of 14 stops; Sonnet forced 9–10 s with all 14.
+- **Check-ins 27 s → 17 s:** 20 in parallel (`CHECKIN_WORKERS`).
+- **SMS in one language:** Jobs 1 and 4 get the "medicine"/"equipment" word already in the message's language (`depends_on_word`); Lupe's daughter now gets "necesita equipo".
+- **Job 3 wording:** `reply_status` ("no reply yet", "replied asking for help", …) replaces `said_they_are_ok`; the prompt says first name, no he/she, and never "hasn't confirmed" unless there is no reply. Seen in the rerun: "Minh, 78, uses oxygen…", Denise "their generator".
+- **Job 2 confidence** is about what the reply means, not the resident's risk (`assess.md`, the tool hint). In one run a bare "1" from a dialysis patient got 0.75 "because he lives alone", so the OK discount didn't apply (High instead of OK).
+- Tests: 125 passed (new: translated word in the contact SMS, reply status, hard deadline with a slow model, preloaded first message, plan repair).
+- Rerun on real AWS (stack `stillhere`, mode C): reset 5 s, check-ins 17 s, hero replies 5–7 s each and all as labeled, Others reply 39 s with every test reply in its labeled band, +3 h 12 s (exactly the 4 silent), **plan 15 s: AI plan, 17 stops, nothing uncovered, real road routes**, approve/route sheet/done 5 s. Eval 20/20, privacy no hits.
+**Not done / cut:**
+- No deployed API yet (mode C), so the 30 s limit is still untested behind API Gateway; the timings above are on a laptop.
+**Blockers / risks:**
+- The AI plan put two wheelchair rides in the SUV (vol-1) while the accessible van took none of them. No rule says a power-wheelchair ride needs the accessible vehicle. See Open questions.
+**Next steps:**
+- P2: the organizers' IAM answer, then mode A or B and the same smoke test on the deployed URL.
 
 ### 2026-10-23 · H0–H8 · First real-AWS run (mode C): smoke test and AI eval
 **By:** Claude session · **Branch/PR:** `docs/aws-smoke-test`
@@ -503,7 +525,7 @@ From [PLAN.md §18](PLAN.md#18-pre-event-checklist-and-open-questions):
 
 - [ ] **Event schedule:** hacking has started; record the exact H0 clock time so H0 to H18 maps to the clock.
 - [ ] **IAM in the event account:** it can't create roles, so the Lambda can't be deployed as is. Ask the organizers to allow role creation (mode A) or to provide a Lambda role (mode B; exact ask in [AWS_SETUP.md §2](AWS_SETUP.md#2-deploy-the-stack)). Until then, mode C (`DeployApi=false`, backend run locally); mode C is deployed and works (2026-10-23 21:55 UTC). (P2)
-- [ ] **`/plans` over 30 s on real Bedrock** (35 s: agent budget 20 s, then greedy plan): faster agent, smaller budget, or plan outside the request? Must be solved before modes A/B. (P3, P2)
+- [ ] **Wheelchair rides:** should a ride for a power-wheelchair user require the accessible van (a `submit_plan` rule plus a planner prompt line)? On real AWS the AI put two of them in the SUV. (P3, P4)
 - [ ] **Amazon Location:** style and 3D terrain are confirmed at the style level in us-west-2 and `us-east-1`, and `OptimizeWaypoints`/`CalculateRoutes` answer in `us-east-1` (a straight-line fallback stays). Still open: a visual check with the key, and real routes on the deploy. Mapbox token only if both Amazon options fail.
 - [ ] **Accounts:** an Amplify app connected to this repo; a screen recorder ready (for example OBS).
 - [ ] **Which repo Amplify connects:** the team repo `harbul/Spartan-hack` or the fork? It deploys `main` on every push. (P2)

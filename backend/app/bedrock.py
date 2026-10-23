@@ -313,6 +313,11 @@ def depends_on(resident: Resident) -> str:
     return "medicine" if set(resident.devices) == {"insulin"} else "equipment"
 
 
+def depends_on_word(resident: Resident, language: str) -> str:
+    """depends_on() in the message's language, so the model never copies the English word."""
+    return DEPENDS_ON_WORD[language][depends_on(resident)]
+
+
 def with_stop_line(text: str) -> str:
     """Every resident-facing SMS carries the opt-out; a hard rule, not a model preference."""
     text = text.strip().strip('"')
@@ -361,7 +366,7 @@ SAFE_CHECKIN = {
     "vi": "Chào {first_name}, đây là Quận Santa Clara. Khu vực của bạn mất điện từ {power_off} đến khoảng "
     "{power_back_estimate}. Khi không có điện, {depends_on} của bạn dùng được bao nhiêu giờ? Trả lời 1 nếu ổn, 2 nếu cần giúp.",
 }
-# depends_on() is "medicine" or "equipment"; the fixed texts need it in the resident's language.
+# depends_on() is "medicine" or "equipment"; SMS jobs get it in the message's language.
 DEPENDS_ON_WORD = {
     "en": {"medicine": "medicine", "equipment": "equipment"},
     "es": {"medicine": "medicina", "equipment": "equipo"},
@@ -390,7 +395,7 @@ def write_checkin(resident: Resident, outage: Outage) -> JobResult[str]:
     facts = {
         "first_name": first_name(resident),
         "language": LANGUAGE_NAMES[resident.language],
-        "depends_on": depends_on(resident),
+        "depends_on": depends_on_word(resident, resident.language),
         "power_off": local_time(outage.starts_at),
         "power_back_estimate": local_time(outage.est_restore_at),
     }
@@ -402,16 +407,15 @@ def write_checkin(resident: Resident, outage: Outage) -> JobResult[str]:
         temperature=0.3,
         guardrail=True,
     )
-    if result.blocked:
-        word = DEPENDS_ON_WORD[resident.language][facts["depends_on"]]
-        text = SAFE_CHECKIN[resident.language].format(**{**facts, "depends_on": word})
-    else:
-        text = result.text
+    text = SAFE_CHECKIN[resident.language].format(**facts) if result.blocked else result.text
     return JobResult(with_stop_line(text), result.trace_id)
 
 
+CHECKIN_WORKERS = 20  # 40 residents in ~2 rounds of Bedrock calls; 10 took 27 s on real Bedrock
+
+
 def write_checkins(
-    residents: list[Resident], outage: Outage, workers: int = 10
+    residents: list[Resident], outage: Outage, workers: int = CHECKIN_WORKERS
 ) -> dict[str, JobResult[str]]:
     """Job 1 for every resident in parallel. Keyed by resident_id."""
     with ThreadPoolExecutor(max_workers=workers) as pool:
@@ -470,7 +474,7 @@ def explain_priority(
             "baseline_backup_hours": resident.baseline_backup_hours,
         },
         "score_parts": {k: v for k, v in parts.items() if v},
-        "said_they_are_ok": breakdown.status_ok_multiplier < 1,
+        "reply_status": _reply_status(assessment, breakdown),
         "reply": None
         if assessment is None
         else {
@@ -489,6 +493,19 @@ def explain_priority(
         temperature=0.2,
     )
     return JobResult(result.text.strip().strip('"'), result.trace_id)
+
+
+def _reply_status(assessment: Assessment | None, breakdown: ScoreBreakdown) -> str:
+    """What the resident told us, in plain words, so the explainer never guesses (e.g. "hasn't confirmed")."""
+    if assessment is None:
+        return "no reply yet"
+    if breakdown.status_ok_multiplier < 1:
+        return "replied that they are OK"
+    if assessment.status == "ok":
+        return "replied that they are OK, but the reply was not clear enough to lower the priority"
+    if assessment.status == "needs_help":
+        return "replied asking for help"
+    return "replied, but the reply was unclear"
 
 
 # --- Job 4: escalation drafter (fast model) ---------------------------------
@@ -527,7 +544,7 @@ def draft_escalation(resident: Resident, case: Case, level: int) -> JobResult[Es
             "language": LANGUAGE_NAMES[contact.language],
             "resident_first_name": first_name(resident),
             "silent_since": silent_since,
-            "depends_on": depends_on(resident),
+            "depends_on": depends_on_word(resident, contact.language),
         }
     else:
         facts = {

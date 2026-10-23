@@ -30,7 +30,8 @@ _ASSESSMENT_HINTS = {
     "detected_language": "ISO 639-1 code of the reply, e.g. en, es, vi",
     "english_translation": "Faithful English translation of the whole reply",
     "key_quote": "The most important words, copied exactly in the original language",
-    "confidence": "0-1, how sure you are of status and needs; below 0.6 goes to human review",
+    "confidence": "0-1, how sure you are of what the reply means (status and needs), not how at-risk the resident is; "
+    "a bare 1 or 2 is clear; below 0.6 goes to human review",
     "reasoning": "1-2 sentences in English",
 }
 
@@ -58,12 +59,36 @@ RECORD_ASSESSMENT: dict[str, Any] = {
 # --- Job 5: dispatch agent tools ----------------------------------------------------
 
 MAX_STOPS = 6  # per volunteer (§4 Job 5)
+# What a volunteer brings per action when the plan doesn't say (the agent may leave items out to answer faster).
+DEFAULT_ITEMS = {
+    "cooler": ["cooler", "ice packs"],
+    "battery": ["charged battery pack"],
+    "door_knock": ["phone", "printed resource center info"],
+    "ride": ["seat for one"],
+}
 COVER_PRIORITY = 60  # every case at or above this should be in a run
 
 
 def must_cover(case: dict) -> bool:
     """Priority 60+ (§4 Job 5), and every silent (L3) case: a door-knock in the next plan (§5)."""
     return case["priority"] >= COVER_PRIORITY or case["status"] == "silent"
+
+def default_action(case: dict) -> str:
+    """The action a case needs when nobody (the agent) has chosen one: greedy plan and plan repair."""
+    if case["status"] in ("escalated", "silent"):
+        return "door_knock"
+    if case["needs_transport"] or "transport" in case["needs"]:
+        return "ride"
+    if "cooling_for_medication" in case["needs"]:
+        return "cooler"
+    if "power_for_device" in case["needs"]:
+        return "battery"
+    return "door_knock"
+
+
+def default_reason(case: dict) -> str:
+    return case["why"] or f"{case['band']} priority, needs: {', '.join(case['needs'])}"
+
 
 OPEN_STATUSES = ("needs_help", "escalated", "silent")
 ACTIONS = list(get_args(StopAction))
@@ -111,10 +136,11 @@ AGENT_TOOLS: list[dict[str, Any]] = [
                                 "properties": {
                                     "resident_id": {"type": "string"},
                                     "action": {"type": "string", "enum": ACTIONS},
-                                    "items": {"type": "array", "items": {"type": "string"}},
+                                    "items": {"type": "array", "items": {"type": "string"},
+                                              "description": "optional; leave out to use the standard kit for the action"},
                                     "reason": {"type": "string", "description": "one line: why this stop"},
                                 },
-                                "required": ["resident_id", "action", "items", "reason"],
+                                "required": ["resident_id", "action", "reason"],
                             },
                         },
                     },
@@ -271,7 +297,15 @@ def submit_plan(outage_id: str, runs: list[dict[str, Any]], summary: str, trace_
             run_id=f"run-{uuid.uuid4().hex[:8]}",
             volunteer=volunteer["volunteer_id"],
             vehicle=volunteer["vehicle"],
-            stops=[Stop(**{k: by_id[ids[i]][k] for k in ("resident_id", "action", "items", "reason")}) for i in order],
+            stops=[
+                Stop(
+                    resident_id=ids[i],
+                    action=by_id[ids[i]]["action"],
+                    items=by_id[ids[i]].get("items") or DEFAULT_ITEMS.get(by_id[ids[i]]["action"], []),
+                    reason=by_id[ids[i]]["reason"],
+                )
+                for i in order
+            ],
             geometry=route["geometry"],
             duration_min=route["duration_min"],
         ), route["fallback"]
@@ -291,6 +325,66 @@ def submit_plan(outage_id: str, runs: list[dict[str, Any]], summary: str, trace_
     )
 
 
+def repair_runs(outage_id: str, runs: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[str]]:
+    """Fix the agent's mechanical slips in code instead of spending another ~10 s model turn.
+
+    On real Bedrock the agent sometimes listed a resident twice or missed one. Repeat stops
+    are dropped; must-cover cases it missed go to the nearest volunteer with room (a ride
+    only with a free seat). Anything else is left for submit_plan to reject. Returns the
+    runs and one note per change, for the plan summary.
+    """
+    cases = {c["resident_id"]: c for c in list_open_cases(outage_id)}
+    volunteers = {v["volunteer_id"]: v for v in list_volunteers()}
+    notes: list[str] = []
+    seen: set[str] = set()
+    fixed = []
+    for run in runs:
+        stops = []
+        for stop in run.get("stops") or []:
+            rid = stop.get("resident_id")
+            if rid in seen:
+                notes.append(f"removed a second stop for {cases.get(rid, {}).get('name', rid)}")
+                continue
+            seen.add(rid)
+            stops.append(stop)
+        fixed.append({**run, "stops": stops})
+
+    by_vid = {r.get("volunteer_id"): r for r in fixed if r.get("volunteer_id") in volunteers}
+    for vid in volunteers:
+        if vid not in by_vid:
+            by_vid[vid] = {"volunteer_id": vid, "stops": []}
+            fixed.append(by_vid[vid])
+    residents = {r.resident_id: r for r in store.list_residents()}
+
+    def last_point(vid: str) -> tuple[float, float]:
+        stops = [s for s in by_vid[vid]["stops"] if s.get("resident_id") in residents]
+        if stops:
+            r = residents[stops[-1]["resident_id"]]
+            return r.lat, r.lng
+        start = volunteers[vid]["start"]
+        return start["lat"], start["lng"]
+
+    def seats_left(vid: str) -> int:
+        return volunteers[vid]["capacity"] - sum(1 for s in by_vid[vid]["stops"] if s.get("action") == "ride")
+
+    for case in cases.values():  # highest priority first
+        if case["resident_id"] in seen or not must_cover(case):
+            continue
+        room = [vid for vid in by_vid if len(by_vid[vid]["stops"]) < MAX_STOPS]
+        action = default_action(case)
+        if action == "ride" and not any(seats_left(vid) > 0 for vid in room):
+            action = "door_knock"
+        if action == "ride":
+            room = [vid for vid in room if seats_left(vid) > 0]
+        if not room:
+            break  # full: submit_plan lists the rest as the next wave
+        vid = min(room, key=lambda v: geo.distance_km(*last_point(v), case["lat"], case["lng"]))
+        by_vid[vid]["stops"].append({"resident_id": case["resident_id"], "action": action, "reason": default_reason(case)})
+        seen.add(case["resident_id"])
+        notes.append(f"added {case['name']} ({case['band']}), which the AI plan missed")
+    return [r for r in fixed if r["stops"] or r.get("volunteer_id") not in volunteers], notes
+
+
 def run_tool(name: str, tool_input: dict[str, Any], outage_id: str) -> Any:
     """Dispatch one toolUse block from the agent. submit_plan returns a Plan; everything
     else (and every error) returns a JSON-able dict for the toolResult."""
@@ -304,7 +398,11 @@ def run_tool(name: str, tool_input: dict[str, Any], outage_id: str) -> Any:
         if name == "optimize_run":
             return optimize_run(tool_input["volunteer_id"], list(tool_input["resident_ids"]))
         if name == "submit_plan":
-            return submit_plan(outage_id, tool_input["runs"], tool_input.get("summary", ""))
+            runs, notes = repair_runs(outage_id, tool_input["runs"])
+            summary = tool_input.get("summary", "")
+            if notes:
+                summary += f" (Rules adjusted the AI plan: {'; '.join(notes)}.)"
+            return submit_plan(outage_id, runs, summary)
         return {"error": f"unknown tool {name!r}"}
     except PlanError as err:
         return {"error": "plan rejected, fix and submit again", "problems": err.problems}
