@@ -47,7 +47,7 @@ The golden path in the app:
 
 ## 4. Critical path: the AWS gate (do this first, in order)
 
-Owner: **P2**, with **P3** on steps 2, 6 and 7 and **P4** on step 8. Commands are in [README → Deploy](../README.md#deploy).
+Owner: **P2**, with **P3** on steps 2, 6 and 7 and **P4** on step 8. **Every AWS service, permission, quota and value is listed in [AWS_SETUP.md](AWS_SETUP.md)**; work through it for steps 1–5. Commands are in [README → Deploy](../README.md#deploy).
 
 1. **Credentials:** `aws configure`; region `us-west-2` unless the event says otherwise (record it in PROGRESS.md).
 2. **Bedrock model access:** request a fast and a strong Claude model in the console, then list the inference profile IDs (`aws bedrock list-inference-profiles`).
