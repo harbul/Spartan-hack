@@ -173,7 +173,7 @@
         "insulin"
       ],
       "baseline_backup_hours": 12,
-      "lives_alone": false,
+      "lives_alone": true,
       "emergency_contact": {
         "name": "Lê Hùng",
         "relation": "son",
@@ -218,7 +218,7 @@
         "power_wheelchair"
       ],
       "baseline_backup_hours": 7,
-      "lives_alone": false,
+      "lives_alone": true,
       "emergency_contact": {
         "name": "Đặng Nam",
         "relation": "sister",
@@ -417,14 +417,14 @@
         "oxygen"
       ],
       "baseline_backup_hours": 5,
-      "lives_alone": false,
+      "lives_alone": true,
       "emergency_contact": {
         "name": "Brian Soto",
         "relation": "brother",
         "phone": "+14085550159",
         "language": "en"
       },
-      "notes": "Demo data. Home oxygen concentrator."
+      "notes": "Demo data. Home oxygen concentrator. Lives alone; her daughter came over when the power went out."
     },
     {
       "resident_id": "res-020",
@@ -638,7 +638,7 @@
         "insulin"
       ],
       "baseline_backup_hours": 21,
-      "lives_alone": false,
+      "lives_alone": true,
       "emergency_contact": {
         "name": "Chris Chen",
         "relation": "neighbor",
@@ -659,8 +659,8 @@
       "devices": [
         "power_wheelchair"
       ],
-      "baseline_backup_hours": 16,
-      "lives_alone": true,
+      "baseline_backup_hours": 12,
+      "lives_alone": false,
       "emergency_contact": {
         "name": "Michael Johnson",
         "relation": "granddaughter",

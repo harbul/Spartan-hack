@@ -1,0 +1,155 @@
+{
+  "_meta": {
+    "about": "Simple OK replies from the 16 background residents who have no labeled test reply. In the golden path they arrive right after check-ins, so most of the map turns green and only Lupe (res-005) and three others (res-025, res-036, res-039) stay silent and climb the escalation ladder.",
+    "plan": "§3 demo scenario (silence is the signal), §5 escalation, §17 golden-path script",
+    "owner": "P4 (Story, data and video); sent by P2's crowd-replies step (PROPOSED)",
+    "fields": "resident_id and language as in residents.json; text is sent through the same /inbound path as a real reply; expected: every one is status ok and band OK (confidence >= 0.8 assumed). Silent residents are those with neither a test reply nor a crowd reply.",
+    "shape": "list key crowd_replies, so store.load_seed('crowd_replies') works"
+  },
+  "crowd_replies": [
+    {
+      "resident_id": "res-009",
+      "language": "vi",
+      "text": "Tôi ổn, cảm ơn",
+      "expected": {
+        "status": "ok",
+        "band": "OK"
+      }
+    },
+    {
+      "resident_id": "res-011",
+      "language": "vi",
+      "text": "1",
+      "expected": {
+        "status": "ok",
+        "band": "OK"
+      }
+    },
+    {
+      "resident_id": "res-013",
+      "language": "vi",
+      "text": "Nhà tôi ổn, con trai mang máy phát điện tới rồi",
+      "expected": {
+        "status": "ok",
+        "band": "OK"
+      }
+    },
+    {
+      "resident_id": "res-014",
+      "language": "vi",
+      "text": "Cảm ơn, tôi không sao",
+      "expected": {
+        "status": "ok",
+        "band": "OK"
+      }
+    },
+    {
+      "resident_id": "res-015",
+      "language": "vi",
+      "text": "1 - ổn",
+      "expected": {
+        "status": "ok",
+        "band": "OK"
+      }
+    },
+    {
+      "resident_id": "res-016",
+      "language": "vi",
+      "text": "Chúng tôi ổn, cảm ơn nhiều",
+      "expected": {
+        "status": "ok",
+        "band": "OK"
+      }
+    },
+    {
+      "resident_id": "res-021",
+      "language": "es",
+      "text": "Todo bien, gracias",
+      "expected": {
+        "status": "ok",
+        "band": "OK"
+      }
+    },
+    {
+      "resident_id": "res-022",
+      "language": "es",
+      "text": "1",
+      "expected": {
+        "status": "ok",
+        "band": "OK"
+      }
+    },
+    {
+      "resident_id": "res-023",
+      "language": "es",
+      "text": "Estoy bien, mi hija está conmigo esta noche",
+      "expected": {
+        "status": "ok",
+        "band": "OK"
+      }
+    },
+    {
+      "resident_id": "res-024",
+      "language": "es",
+      "text": "Bien, ya hice mi tratamiento hoy. Gracias",
+      "expected": {
+        "status": "ok",
+        "band": "OK"
+      }
+    },
+    {
+      "resident_id": "res-026",
+      "language": "es",
+      "text": "1 gracias",
+      "expected": {
+        "status": "ok",
+        "band": "OK"
+      }
+    },
+    {
+      "resident_id": "res-027",
+      "language": "es",
+      "text": "Estamos bien, tenemos hielera con hielo",
+      "expected": {
+        "status": "ok",
+        "band": "OK"
+      }
+    },
+    {
+      "resident_id": "res-035",
+      "language": "en",
+      "text": "All good here, my neighbor has a generator and I'm charged up",
+      "expected": {
+        "status": "ok",
+        "band": "OK"
+      }
+    },
+    {
+      "resident_id": "res-037",
+      "language": "en",
+      "text": "1",
+      "expected": {
+        "status": "ok",
+        "band": "OK"
+      }
+    },
+    {
+      "resident_id": "res-038",
+      "language": "en",
+      "text": "We're ok, thanks for checking",
+      "expected": {
+        "status": "ok",
+        "band": "OK"
+      }
+    },
+    {
+      "resident_id": "res-040",
+      "language": "en",
+      "text": "Fine for now, thank you",
+      "expected": {
+        "status": "ok",
+        "band": "OK"
+      }
+    }
+  ]
+}
