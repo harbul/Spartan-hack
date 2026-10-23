@@ -16,7 +16,7 @@
 ## Current status
 
 - **Current phase:** H6–H7 (plan renders), built offline while H0–H1 waits on AWS credentials. Next: H7–H8, the golden path on the deployed URL (needs AWS)
-- **Last updated:** 2026-10-23 05:05 UTC · Claude session
+- **Last updated:** 2026-10-23 05:21 UTC · Claude session
 - **Overall health:** 🟡 the whole MUST golden path is code-complete and tested without AWS (103 tests, plus the live UI against the real API with in-memory tables and stand-in Bedrock and Location). Nothing has run on real AWS yet (no credentials); that is now the only thing between us and the H7–H8 gate
 - **Gates:**
   - H0–H1 "Deployed URL returns a Bedrock reply; 3D path chosen" · ⬜ not met (no AWS credentials). 3D path chosen provisionally (Amazon `Terrain3D`)
@@ -48,7 +48,7 @@ Phases and gates from [PLAN.md §13](PLAN.md#13-timeline-18-build-hours). H0 is 
 | H4–H6 | Replies flow into the queue and onto the map | 🔄 in progress: code done and tested offline; real-AWS check blocked on credentials | |
 | H6–H7 | Plan renders | 🔄 in progress: code done and tested offline; real-AWS check blocked on credentials | |
 | H7–H8 | Golden path green, or cut (safety video recorded) | ⬜ not started | |
-| H8–H12 | SHOULD tier done | ⬜ not started | |
+| H8–H12 | SHOULD tier done | 🔄 in progress: 3D map, fly-to, pulse, About panel and Guardrails code done offline | |
 | H12–H14 | Green or harden | ⬜ not started | |
 | H14–H15 | Code freeze: 3 clean runs in a row | ⬜ not started | |
 | H15–H17 | Final cut | ⬜ not started | |
@@ -75,15 +75,15 @@ From [PLAN.md §11](PLAN.md#11-scope-tiers). Tick items as they are finished.
 
 ### SHOULD: H8 to H12
 
-- [ ] 3D terrain and buildings, tilted camera, 2D/3D toggle
-- [ ] Click a marker or card → camera flies to the home → Resident panel opens
-- [ ] Backup-hours countdown per resident, pulsing no-reply markers, Key events list
+- [ ] 3D terrain and buildings, tilted camera, 2D/3D toggle (done on open terrain; Amazon satellite + buildings need the key)
+- [x] Click a marker or card → camera flies to the home → Resident panel opens
+- [ ] Backup-hours countdown per resident, pulsing no-reply markers, Key events list (pulse added; check it on a full-size screen)
 - [ ] Photo replies (multimodal)
 - [ ] Spanish and Vietnamese end to end
-- [ ] Guardrails (denied topic plus PII masking in traces)
+- [ ] Guardrails (denied topic plus PII masking in traces) (code, tests and SAM resources done; needs the deploy)
 - [ ] "Needs human review" path for low confidence
 - [ ] Design polish, plus loading, empty and error states
-- [ ] About panel with sourced stats
+- [ ] About panel with sourced stats (done; stats tagged "to verify" until `sources.md` is checked)
 
 ### STRETCH: only if the golden path is green at H12
 
@@ -138,6 +138,28 @@ Newest entry on top. Template:
 **Next steps:** (who does what next)
 - ...
 ```
+
+### 2026-10-23 · H8–H12 · 3D map, fly-to, pulse, About panel, Guardrails (offline)
+**By:** Claude session · **Branch/PR:** `feat/should-tier`
+**Done:**
+- P1: [`IncidentMap`](../frontend/src/components/map/IncidentMap.tsx) is 3D by default (pitch 60°, looking east at the foothills) with 2D/3D, terrain 1×/2×/3×, Satellite/Hybrid (with a key) and fullscreen. [`terrain.ts`](../frontend/src/components/map/terrain.ts) holds the /3d-test approach: Amazon `Terrain3D` with a key, open Terrain Tiles otherwise (+ hillshade with no key), building extrusions when the Amazon tiles have them. Selecting a resident (marker, queue card, plan stop) flies the camera to the home once per selection.
+- P1: no-reply markers pulse, harder with each escalation level ([`residentsLayer.ts`](../frontend/src/components/map/layers/residentsLayer.ts)).
+- P1: [`AboutPanel`](../frontend/src/components/panels/AboutPanel.tsx): what StillHere does, "AI reads and explains, rules rank, humans decide", the AWS services, and the `sources.md` stats, each tagged "to verify" until it has an Accessed date.
+- P3: Guardrails (§4 Job 6) in [`bedrock.py`](../backend/app/bedrock.py): the advice guardrail runs on Jobs 1 and 4 (SMS only) with fixed EN/ES/VI fallback texts if it blocks a draft; `screen_reply()` checks every inbound reply (ApplyGuardrail) and sends medical-advice questions (e.g. tr-14 "how much extra insulin") to human review while Job 2 still assesses them; `mask_pii()` uses the PII guardrail for names and addresses in traces, phones by pattern as before. Trace rows carry `guardrail_action`; the AI Trace list shows "Guardrail: blocked/passed". Everything is skipped while the guardrail IDs are unset.
+- P2: [`template.yaml`](../infra/template.yaml): `AdviceGuardrail` (denied topic MedicalAdvice) and `PiiGuardrail` (NAME/ADDRESS/PHONE anonymized), their IDs into the Lambda env and stack outputs, `bedrock:ApplyGuardrail` on both. `.env.example` has the PII guardrail vars.
+- Checks: `pytest` 116 passed (new: guardrail config, intervention → trace, safe fallbacks keep the privacy rule, screening, PII masking + fallback), `compileall`, `cfn-lint`, `npm run build`. In Chromium (production build against the offline API): 3D terrain with zone, markers and routes draped on it; 2D toggle; queue click flies to Lupe and opens her panel; About panel.
+**Not done / cut:**
+- Not seen with the Amazon key: satellite imagery, `Terrain3D`, building heights. Guardrails not run on real Bedrock (does the denied topic catch tr-14? does PII masking keep traces readable?).
+- The pulse could only be checked at low resolution in the narrow preview pane; check it on a full-size screen.
+- Photo replies, ES/VI end to end and "needs review" polish need real Bedrock or the photos; design polish not started.
+- `/3d-test` kept for the building-height check with the key; delete after.
+**Decisions made:**
+- See the Decisions log entries for two guardrails, the `guardrail` trace job, and 3D by default.
+**Blockers / risks:**
+- A hidden or background browser tab pauses MapLibre (no `requestAnimationFrame`): the map stays blank until the tab is visible. Record the video with the tab in front.
+**Next steps:**
+- At H0: deploy (creates both guardrails), then send tr-14 from the phone and check the Trace drawer shows "Guardrail: blocked"; open `/` with the key to check satellite + 3D.
+- P1: design polish and the trace step detail. P4: verify sources, then set `verified: true` per stat in `AboutPanel.tsx`.
 
 ### 2026-10-23 · H6–H7 · Merge fix: PR #5 with #8 and #9
 **By:** Claude session · **Branch/PR:** [`claude/focused-einstein-cqibah`](https://github.com/harbul/Spartan-hack/compare/main...neels22:Spartan-hack:claude/focused-einstein-cqibah)
@@ -363,6 +385,10 @@ Decisions that change or clarify the plan. If one changes the plan, `PLAN.md` is
 | 2026-10-23 | Display categories: ok/resolved = Safe; awaiting_reply/escalated/silent = No reply; needs_help/dispatched = Critical if band Critical, else Needs help | One rule (`categoryOf`) for markers, cards and counters; `/dashboard` counts should use the same rule | Claude session |
 | 2026-10-23 | **Silence flood fixed with crowd replies** (option a): after the 4 hero replies, the other 16 test replies and 16 simple OK replies (`data/crowd_replies.json`) arrive; only 4 residents stay silent | Without it, 36 residents go silent at +3 h, swamping the plan (18 stops) and hiding Lupe. Keeps 40 households on the map. Closes the Silence flood question | Team (chosen), Claude session |
 | 2026-10-23 | Test-reply bands must hold with distress ±1 (no score on a 30/60/80 cut-off) | Job 2 distress is a judgment call; a one-notch miss shouldn't flip a band in the eval or on camera. Rosa now lives alone (70, was 60). Closes the Rosa question | Claude session |
+| 2026-10-23 | **Two guardrails:** advice (denied topic) on SMS jobs and reply screening; PII (anonymize) only for trace rows via ApplyGuardrail | One guardrail with PII filters on the SMS jobs would also mask the resident's own name ("Hi {NAME}") | Claude session |
+| 2026-10-23 | A reply asking for medical advice is screened, flagged for human review, and still assessed by Job 2 | Blocking Job 2's input would leave the case with no assessment; the app never answers residents anyway | Claude session |
+| 2026-10-23 | `BedrockJob` gains `"guardrail"` (schemas.py + types.ts) | Reply screening is a Bedrock call with its own trace row in the AI Trace drawer | Claude session |
+| 2026-10-23 | The incident map opens in 3D (pitch 60°, bearing 60°) | The foothills are the visual of the video; 2D stays one click away | Claude session |
 
 ---
 

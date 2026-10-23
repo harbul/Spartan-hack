@@ -265,3 +265,113 @@ def test_escalation_levels(fake_converse):
     assert door["devices"] == ["oxygen"] and door["bring"][0] == "charged battery pack"
     rosa_door = bedrock.draft_escalation(RESIDENTS["res-002"], silent_case("res-002"), 3)
     assert sent_facts(fake_converse[3])["bring"][0] == "cooler with ice" and rosa_door.trace_id == "tr-1"
+
+
+# --- Job 6: Guardrails ------------------------------------------------------------------
+
+GUARDRAIL = "gr-advice"
+PII_GUARDRAIL = "gr-pii"
+
+
+def test_guardrail_is_skipped_until_configured(stub, monkeypatch):
+    monkeypatch.delenv(bedrock.GUARDRAIL_ENV, raising=False)
+    stub.add_response("converse", reply("ok"), {"modelId": FAST, "messages": MESSAGES, "inferenceConfig": ANY})
+    result = bedrock.converse("hello", "", MESSAGES, guardrail=True)
+    assert result.guardrail_action is None and not result.blocked
+
+
+def test_guardrail_config_and_intervention_reach_the_trace(stub, tables, monkeypatch):
+    monkeypatch.setenv(bedrock.GUARDRAIL_ENV, GUARDRAIL)
+    monkeypatch.delenv(bedrock.GUARDRAIL_VERSION_ENV, raising=False)
+    blocked = reply("Santa Clara County is checking on you.") | {"stopReason": "guardrail_intervened"}
+    stub.add_response(
+        "converse",
+        blocked,
+        {
+            "modelId": FAST,
+            "messages": MESSAGES,
+            "inferenceConfig": ANY,
+            "guardrailConfig": {"guardrailIdentifier": GUARDRAIL, "guardrailVersion": "DRAFT", "trace": "enabled"},
+        },
+    )
+    result = bedrock.converse("checkin", "", MESSAGES, guardrail=True)
+    assert result.blocked
+    assert store.list_traces()[0].guardrail_action == "INTERVENED"
+
+
+def blocked_converse(monkeypatch):
+    calls = []
+
+    def fake(job, system, messages, **kwargs):
+        calls.append(kwargs)
+        return bedrock.ConverseResult("blocked", FAST, 10, 1, 1, "guardrail_intervened", {}, "tr-1", "INTERVENED")
+
+    monkeypatch.setattr(bedrock, "converse", fake)
+    return calls
+
+
+@pytest.mark.parametrize("resident_id", ["res-001", "res-002", "res-003"])  # vi oxygen, es insulin, en chair
+def test_blocked_checkin_falls_back_to_a_safe_text(monkeypatch, resident_id):
+    calls = blocked_converse(monkeypatch)
+    resident = RESIDENTS[resident_id]
+    text = bedrock.write_checkin(resident, OUTAGE).output
+    assert calls[0]["guardrail"] is True
+    assert bedrock.first_name(resident) in text and "1" in text and "STOP" in text
+    assert privacy_violations(text) == []
+    assert "medicine" not in text and "equipment" not in text or resident.language == "en"  # localized word
+
+
+def test_blocked_escalation_sms_falls_back_but_door_note_is_not_screened(monkeypatch):
+    calls = blocked_converse(monkeypatch)
+    lupe = RESIDENTS["res-005"]
+    case = Case(outage_id="out-1", resident_id="res-005", status="awaiting_reply", priority=50, band="Watch",
+                last_outbound_at="2026-10-24T01:05:00Z")
+    l1 = bedrock.draft_escalation(lupe, case, 1).output.text
+    l2 = bedrock.draft_escalation(lupe, case, 2).output.text
+    bedrock.draft_escalation(lupe, case, 3)
+    assert [c["guardrail"] for c in calls] == [True, True, False]
+    assert l1.startswith("Hola Lupe") and "STOP" in l1
+    assert lupe.emergency_contact.name.split()[0] in l2 and "Lupe" in l2
+    assert privacy_violations(l1) == privacy_violations(l2) == []
+
+
+def test_screen_reply_flags_a_dosing_question(stub, tables, monkeypatch):
+    monkeypatch.setenv(bedrock.GUARDRAIL_ENV, GUARDRAIL)
+    monkeypatch.delenv(bedrock.PII_GUARDRAIL_ENV, raising=False)
+    stub.add_response(
+        "apply_guardrail",
+        {
+            "usage": {"topicPolicyUnits": 1, "contentPolicyUnits": 0, "wordPolicyUnits": 0,
+                      "sensitiveInformationPolicyUnits": 0, "sensitiveInformationPolicyFreeUnits": 0,
+                      "contextualGroundingPolicyUnits": 0},
+            "action": "GUARDRAIL_INTERVENED",
+            "outputs": [{"text": "This message was passed to a person at Santa Clara County."}],
+            "assessments": [{"topicPolicy": {"topics": [{"name": "MedicalAdvice", "type": "DENY", "action": "BLOCKED"}]}}],
+        },
+        {"guardrailIdentifier": GUARDRAIL, "guardrailVersion": "DRAFT", "source": "INPUT",
+         "content": [{"text": {"text": "how much extra insulin should I take?"}}]},
+    )
+    result = bedrock.screen_reply("how much extra insulin should I take?")
+    assert result.output is True
+    trace = store.list_traces()[0]
+    assert (trace.job, trace.guardrail_action, trace.output) == ("guardrail", "INTERVENED", {"blocked_topics": ["MedicalAdvice"]})
+
+
+def test_screen_reply_is_off_until_configured(monkeypatch):
+    monkeypatch.delenv(bedrock.GUARDRAIL_ENV, raising=False)
+    assert bedrock.screen_reply("how much extra insulin should I take?") is None
+
+
+def test_mask_pii_uses_the_pii_guardrail_then_the_phone_pattern(stub, monkeypatch):
+    monkeypatch.setenv(bedrock.PII_GUARDRAIL_ENV, PII_GUARDRAIL)
+    usage = {"topicPolicyUnits": 0, "contentPolicyUnits": 0, "wordPolicyUnits": 0, "sensitiveInformationPolicyUnits": 1,
+             "sensitiveInformationPolicyFreeUnits": 0, "contextualGroundingPolicyUnits": 0}
+    stub.add_response(
+        "apply_guardrail",
+        {"usage": usage, "action": "GUARDRAIL_INTERVENED", "outputs": [{"text": "{NAME} at {ADDRESS}, 408 555 0105"}],
+         "assessments": []},
+        {"guardrailIdentifier": PII_GUARDRAIL, "guardrailVersion": "DRAFT", "source": "OUTPUT", "content": ANY},
+    )
+    assert bedrock.mask_pii("Lupe Ramírez at 12 Main St, 408 555 0105") == "{NAME} at {ADDRESS}, [phone]"
+    stub.add_client_error("apply_guardrail", "ThrottlingException")
+    assert bedrock.mask_pii("Lupe, +14085550105") == "Lupe, [phone]"  # guardrail down: phones still masked

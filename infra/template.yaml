@@ -24,7 +24,7 @@ Parameters:
   BedrockGuardrailId:
     Type: String
     Default: ""
-    Description: Bedrock Guardrail ID (denied topic + PII filters; PLAN.md §4 Job 6)
+    Description: Optional. An existing advice guardrail to use instead of the one this stack creates (PLAN.md §4 Job 6)
   BedrockGuardrailVersion:
     Type: String
     Default: DRAFT
@@ -36,6 +36,7 @@ Parameters:
 
 Conditions:
   HasFallbackModel: !Not [!Equals [!Ref BedrockFallbackModelId, ""]]
+  HasGuardrailParam: !Not [!Equals [!Ref BedrockGuardrailId, ""]]
 
 Globals:
   Function:
@@ -47,8 +48,10 @@ Globals:
         BEDROCK_FAST_MODEL_ID: !Ref BedrockFastModelId
         BEDROCK_STRONG_MODEL_ID: !Ref BedrockStrongModelId
         BEDROCK_FALLBACK_MODEL_ID: !Ref BedrockFallbackModelId
-        BEDROCK_GUARDRAIL_ID: !Ref BedrockGuardrailId
-        BEDROCK_GUARDRAIL_VERSION: !Ref BedrockGuardrailVersion
+        BEDROCK_GUARDRAIL_ID: !If [HasGuardrailParam, !Ref BedrockGuardrailId, !GetAtt AdviceGuardrail.GuardrailId]
+        BEDROCK_GUARDRAIL_VERSION: !If [HasGuardrailParam, !Ref BedrockGuardrailVersion, DRAFT]
+        BEDROCK_PII_GUARDRAIL_ID: !GetAtt PiiGuardrail.GuardrailId
+        BEDROCK_PII_GUARDRAIL_VERSION: DRAFT
         LOCATION_API_KEY: !Ref LocationApiKey
         RESIDENTS_TABLE: !Ref ResidentsTable
         OUTAGES_TABLE: !Ref OutagesTable
@@ -137,7 +140,16 @@ Resources:
                       - HasFallbackModel
                       - !Sub arn:${AWS::Partition}:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/${BedrockFallbackModelId}
                       - !Ref AWS::NoValue
-            # TODO(P3, §4 Job 6): bedrock:ApplyGuardrail on the guardrail ARN.
+            # Job 6: Converse with guardrailConfig and ApplyGuardrail both need this.
+            - Sid: BedrockGuardrails
+              Effect: Allow
+              Action: bedrock:ApplyGuardrail
+              Resource:
+                - !If
+                  - HasGuardrailParam
+                  - !Sub arn:${AWS::Partition}:bedrock:${AWS::Region}:${AWS::AccountId}:guardrail/${BedrockGuardrailId}
+                  - !GetAtt AdviceGuardrail.GuardrailArn
+                - !GetAtt PiiGuardrail.GuardrailArn
             - Sid: AmazonLocationRoutes # location.py: stop order and road routes (Job 5)
               Effect: Allow
               Action:
@@ -253,10 +265,41 @@ Resources:
         AllowResources:
           - !Sub arn:${AWS::Partition}:geo-maps:${AWS::Region}::provider/default
 
-  # --- Bedrock Guardrail -------------------------------------------------------
-  # TODO(P3): AWS::Bedrock::Guardrail (denied topic: dosing and treatment advice;
-  # PII filters for names, phones, addresses), or create it in the console and
-  # pass its ID as BedrockGuardrailId.
+  # --- Bedrock Guardrails (PLAN.md §4 Job 6) ------------------------------------
+  # Two, because PII filters on the SMS jobs would also mask the resident's own name.
+  # Both are used at their DRAFT version (no publish step needed for the demo).
+
+  AdviceGuardrail: # on every resident-facing SMS (Jobs 1, 4) and to screen replies
+    Type: AWS::Bedrock::Guardrail
+    Properties:
+      Name: !Sub ${AWS::StackName}-advice
+      Description: StillHere never gives medical advice; a person at the county handles it.
+      BlockedInputMessaging: This message was passed to a person at Santa Clara County.
+      BlockedOutputsMessaging: Santa Clara County is checking on you. Reply 1 if you are OK, 2 if you need help.
+      TopicPolicyConfig:
+        TopicsConfig:
+          - Name: MedicalAdvice
+            Type: DENY
+            Definition: >-
+              Advice or instructions about medication doses, changing or skipping a treatment,
+              or how to set or adjust medical equipment such as oxygen, dialysis or insulin pumps.
+            Examples:
+              - How much extra insulin should I take?
+              - Can I skip dialysis tonight?
+              - Should I turn my oxygen flow down so the tank lasts longer?
+
+  PiiGuardrail: # trace rows only, through ApplyGuardrail (bedrock.mask_pii)
+    Type: AWS::Bedrock::Guardrail
+    Properties:
+      Name: !Sub ${AWS::StackName}-pii
+      Description: Masks names, addresses and phone numbers in AI Trace rows.
+      BlockedInputMessaging: "[masked]"
+      BlockedOutputsMessaging: "[masked]"
+      SensitiveInformationPolicyConfig:
+        PiiEntitiesConfig:
+          - { Type: NAME, Action: ANONYMIZE }
+          - { Type: ADDRESS, Action: ANONYMIZE }
+          - { Type: PHONE, Action: ANONYMIZE }
 
 Outputs:
   ApiUrl:
@@ -269,3 +312,9 @@ Outputs:
     Value: !Sub ${AWS::StackName}-maps
   PhotosBucketName:
     Value: !Ref PhotosBucket
+  AdviceGuardrailId:
+    Description: BEDROCK_GUARDRAIL_ID for local runs
+    Value: !GetAtt AdviceGuardrail.GuardrailId
+  PiiGuardrailId:
+    Description: BEDROCK_PII_GUARDRAIL_ID for local runs
+    Value: !GetAtt PiiGuardrail.GuardrailId

@@ -56,7 +56,7 @@ EventType = Literal[
 ]
 ResourceType = Literal["resource_center", "pharmacy"]
 StopAction = Literal["cooler", "battery", "door_knock", "ride"]
-BedrockJob = Literal["checkin", "assess", "explain", "escalate", "planner"]
+BedrockJob = Literal["checkin", "assess", "explain", "escalate", "planner", "guardrail"]  # guardrail: reply screening (Job 6)
 
 # Timestamps are ISO 8601 strings in UTC (virtual time where noted).
 Timestamp = str

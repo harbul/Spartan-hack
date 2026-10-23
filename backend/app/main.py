@@ -206,6 +206,8 @@ def inbound(body: InboundRequest) -> CaseResponse:
         store.put_photo(image_key, image, f"image/{fmt}")
 
     sent = [m for m in store.list_messages(resident.resident_id) if m.direction == "out" and m.channel == "sms"]
+    # Job 6: a reply asking for medical advice (e.g. a dose) is never answered by the app; a person takes it.
+    screened = bedrock.screen_reply(body.text) if body.text.strip() else None
     assessed = bedrock.assess_reply(resident, sent[-1].text if sent else "", body.text, image)
     a = assessed.output
     store.add_message(
@@ -224,7 +226,7 @@ def inbound(body: InboundRequest) -> CaseResponse:
     before = case.status
     case.assessment = a
     case.last_inbound_at = ts
-    case.needs_review = a.confidence < triage.REVIEW_CONFIDENCE
+    case.needs_review = a.confidence < triage.REVIEW_CONFIDENCE or bool(screened and screened.output)
     if before not in ("dispatched", "resolved"):
         # "unclear" still means a person answered: someone should look, not escalate.
         case.status = "ok" if a.status == "ok" else "needs_help"
