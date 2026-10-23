@@ -1,0 +1,206 @@
+# StillHere SAM template: Lambda (FastAPI + Mangum), HTTP API, DynamoDB tables,
+# photo bucket, EventBridge Scheduler escalation check, IAM.
+# Deploy from infra/: `sam build && sam deploy --guided`.
+# Amplify Hosting (frontend) is connected to the repo in the console, not here.
+#
+# Implements: PLAN.md §6 (architecture), §7 (tables), §5 (1-minute escalation schedule).
+# Owner: P2 (Backend and infra).
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: StillHere - emergency response command center (SpartHill Hacks 2026)
+
+Parameters:
+  BedrockFastModelId:
+    Type: String
+    Description: Cross-region inference profile ID for the fast model (confirm in hour 0)
+  BedrockStrongModelId:
+    Type: String
+    Description: Cross-region inference profile ID for the strong model (confirm in hour 0)
+  BedrockFallbackModelId:
+    Type: String
+    Default: ""
+    Description: Fallback model ID if access to the main ones is slow or denied (PLAN.md §16)
+  BedrockGuardrailId:
+    Type: String
+    Default: ""
+    Description: Bedrock Guardrail ID (denied topic + PII filters; PLAN.md §4 Job 6)
+  BedrockGuardrailVersion:
+    Type: String
+    Default: DRAFT
+  LocationApiKey:
+    Type: String
+    Default: ""
+    NoEcho: true
+    Description: Optional. Amazon Location API key for Routes; leave empty to use the Lambda role.
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Timeout: 30 # HTTP API caps requests at 30 s; the agent targets ~20 s (PLAN.md §17)
+    MemorySize: 1024
+    Environment:
+      Variables:
+        BEDROCK_FAST_MODEL_ID: !Ref BedrockFastModelId
+        BEDROCK_STRONG_MODEL_ID: !Ref BedrockStrongModelId
+        BEDROCK_FALLBACK_MODEL_ID: !Ref BedrockFallbackModelId
+        BEDROCK_GUARDRAIL_ID: !Ref BedrockGuardrailId
+        BEDROCK_GUARDRAIL_VERSION: !Ref BedrockGuardrailVersion
+        LOCATION_API_KEY: !Ref LocationApiKey
+        RESIDENTS_TABLE: !Ref ResidentsTable
+        OUTAGES_TABLE: !Ref OutagesTable
+        CASES_TABLE: !Ref CasesTable
+        MESSAGES_TABLE: !Ref MessagesTable
+        PLANS_TABLE: !Ref PlansTable
+        TRACES_TABLE: !Ref TracesTable
+        EVENTS_TABLE: !Ref EventsTable
+        CONFIG_TABLE: !Ref ConfigTable
+        PHOTOS_BUCKET: !Ref PhotosBucket
+
+Resources:
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      CorsConfiguration:
+        AllowOrigins: ["*"] # TODO(P2): restrict to the Amplify URL and localhost
+        AllowMethods: [GET, POST, OPTIONS]
+        AllowHeaders: [content-type]
+
+  ApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../backend/
+      Handler: app.main.handler
+      # TODO(P2): /demo/reset reseeds from data/, which is outside CodeUri.
+      # See docs/PROGRESS.md, Open questions.
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /{proxy+}
+            Method: ANY
+        EscalationCheck:
+          Type: ScheduleV2 # EventBridge Scheduler
+          Properties:
+            ScheduleExpression: rate(1 minute)
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref ResidentsTable }
+        - DynamoDBCrudPolicy: { TableName: !Ref OutagesTable }
+        - DynamoDBCrudPolicy: { TableName: !Ref CasesTable }
+        - DynamoDBCrudPolicy: { TableName: !Ref MessagesTable }
+        - DynamoDBCrudPolicy: { TableName: !Ref PlansTable }
+        - DynamoDBCrudPolicy: { TableName: !Ref TracesTable }
+        - DynamoDBCrudPolicy: { TableName: !Ref EventsTable }
+        - DynamoDBCrudPolicy: { TableName: !Ref ConfigTable }
+        - S3CrudPolicy: { BucketName: !Ref PhotosBucket }
+        - Statement:
+            - Effect: Allow
+              Action: # TODO(P2/P3): scope Resource to the model and guardrail ARNs
+                - bedrock:InvokeModel
+                - bedrock:InvokeModelWithResponseStream
+                - bedrock:ApplyGuardrail
+              Resource: "*"
+            - Effect: Allow
+              Action:
+                - geo-routes:OptimizeWaypoints
+                - geo-routes:CalculateRoutes
+              Resource: "*"
+
+  # --- DynamoDB tables (PLAN.md §7), all on-demand ---------------------------
+
+  ResidentsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions: [{ AttributeName: resident_id, AttributeType: S }]
+      KeySchema: [{ AttributeName: resident_id, KeyType: HASH }]
+
+  OutagesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions: [{ AttributeName: outage_id, AttributeType: S }]
+      KeySchema: [{ AttributeName: outage_id, KeyType: HASH }]
+
+  CasesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - { AttributeName: outage_id, AttributeType: S }
+        - { AttributeName: resident_id, AttributeType: S }
+      KeySchema:
+        - { AttributeName: outage_id, KeyType: HASH }
+        - { AttributeName: resident_id, KeyType: RANGE }
+
+  MessagesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - { AttributeName: resident_id, AttributeType: S }
+        - { AttributeName: ts, AttributeType: S }
+      KeySchema:
+        - { AttributeName: resident_id, KeyType: HASH }
+        - { AttributeName: ts, KeyType: RANGE }
+
+  PlansTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions: [{ AttributeName: plan_id, AttributeType: S }]
+      KeySchema: [{ AttributeName: plan_id, KeyType: HASH }]
+
+  TracesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions: [{ AttributeName: trace_id, AttributeType: S }]
+      KeySchema: [{ AttributeName: trace_id, KeyType: HASH }]
+      # TODO(P2): GET /traces?limit=50 wants newest first; scan + sort is fine at demo scale.
+
+  EventsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - { AttributeName: outage_id, AttributeType: S }
+        - { AttributeName: ts, AttributeType: S }
+      KeySchema:
+        - { AttributeName: outage_id, KeyType: HASH }
+        - { AttributeName: ts, KeyType: RANGE }
+
+  ConfigTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions: [{ AttributeName: key, AttributeType: S }]
+      KeySchema: [{ AttributeName: key, KeyType: HASH }]
+
+  # --- S3: reply photos ------------------------------------------------------
+
+  PhotosBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  # --- Amazon Location ---------------------------------------------------------
+  # TODO(P1/P2, hour 0): the browser map key (VITE_LOCATION_API_KEY) can be an
+  # AWS::Location::APIKey here or made in the console. Confirm satellite style,
+  # 3D terrain and OptimizeWaypoints in our region first (PLAN.md §6, §18).
+
+  # --- Bedrock Guardrail -------------------------------------------------------
+  # TODO(P3): AWS::Bedrock::Guardrail (denied topic: dosing and treatment advice;
+  # PII filters for names, phones, addresses), or create it in the console and
+  # pass its ID as BedrockGuardrailId.
+
+Outputs:
+  ApiUrl:
+    Description: Base URL for VITE_API_URL
+    Value: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com"
+  PhotosBucketName:
+    Value: !Ref PhotosBucket

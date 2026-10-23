@@ -1,0 +1,22 @@
+{
+  "_meta": {
+    "about": "20 labeled resident replies (EN/ES/VI, typos, ambiguous, 2 photos). Used by backend/tests/eval_replies.py and as quick replies in the phone simulator. One example record so far.",
+    "plan": "§3 demo scenario, §9 phone simulator quick replies, §17 AI eval",
+    "owner": "P4 (Story, data and video); labels reviewed by P3",
+    "fields": "image: path to a photo or null; expected: labels the eval compares (need type and band)"
+  },
+  "replies": [
+    {
+      "reply_id": "tr-01",
+      "resident_id": "res-002",
+      "language": "es",
+      "text": "tengo 3 plumas, el refri ya no enfría",
+      "image": null,
+      "expected": {
+        "status": "needs_help",
+        "needs": ["cooling_for_medication"],
+        "band": "High"
+      }
+    }
+  ]
+}
