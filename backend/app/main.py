@@ -9,6 +9,7 @@ Owner: P2 (Backend and infra).
 
 import base64
 import binascii
+import logging
 import uuid
 
 from botocore.exceptions import BotoCoreError, ClientError
@@ -43,6 +44,7 @@ from app.schemas import (
     Volunteer,
 )
 
+log = logging.getLogger(__name__)
 app = FastAPI(title="StillHere API")
 
 # Local runs (uvicorn). In Lambda, API Gateway answers CORS itself (infra/template.yaml).
@@ -207,7 +209,7 @@ def inbound(body: InboundRequest) -> CaseResponse:
 
     sent = [m for m in store.list_messages(resident.resident_id) if m.direction == "out" and m.channel == "sms"]
     # Job 6: a reply asking for medical advice (e.g. a dose) is never answered by the app; a person takes it.
-    screened = bedrock.screen_reply(body.text) if body.text.strip() else None
+    screened = _screen(body.text)
     assessed = bedrock.assess_reply(resident, sent[-1].text if sent else "", body.text, image)
     a = assessed.output
     store.add_message(
@@ -401,6 +403,17 @@ def _outage(outage_id: str) -> Outage:
     if not outage:
         raise HTTPException(status_code=404, detail=f"No outage {outage_id}")
     return outage
+
+
+def _screen(text: str):
+    """Guardrail screening is a safety net, not a gate: if it fails, the reply still goes through."""
+    if not text.strip():
+        return None
+    try:
+        return bedrock.screen_reply(text)
+    except Exception as err:  # noqa: BLE001  (a guardrail outage must not lose a resident's reply)
+        log.warning("reply screening failed, continuing without it: %s", err)
+        return None
 
 
 def _run(run_id: str):

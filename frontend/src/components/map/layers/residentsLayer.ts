@@ -2,7 +2,8 @@
  * Resident markers colored by status (green Safe, amber Needs help, red Critical,
  * gray-violet No reply), white outline; no-reply markers grow with each escalation level.
  * No-reply markers also pulse, harder at each escalation level (§9.1: silence is the signal);
- * startPulse() runs the animation.
+ * startPulse() runs the animation, only while some marker pulses and at most PULSE_FPS
+ * times a second: every paint change makes MapLibre redraw the whole (3D) map.
  * Adds the layers on the first call and updates their data after that.
  *
  * Implements: PLAN.md §9.1 (3D incident map). Owner: P1 (Frontend and UX).
@@ -15,8 +16,11 @@ import { CATEGORY, categoryOf } from '../../status';
 export const RESIDENTS_LAYER = 'residents';
 const PULSE_LAYER = 'residents-pulse';
 const PULSE_MS = 1600;
+const PULSE_FPS = 20;
+const pulsing = new WeakMap<Map, boolean>(); // set by addResidentsLayer, read by startPulse
 
 export function addResidentsLayer(map: Map, data: DashboardCase[], selectedId: string | null = null): void {
+  pulsing.set(map, data.some((c) => categoryOf(c) === 'no_reply'));
   const collection: FeatureCollection = {
     type: 'FeatureCollection',
     features: data.map((c) => ({
@@ -63,17 +67,27 @@ export function addResidentsLayer(map: Map, data: DashboardCase[], selectedId: s
   map.setFilter('residents-selected', ['==', ['get', 'id'], selectedId ?? '']);
 }
 
-/** Animate the no-reply rings: each one grows and fades every PULSE_MS. Returns a stop function. */
+/** Animate the no-reply rings: each one grows and fades every PULSE_MS. Returns a stop function.
+ * Idle (no redraws) while nothing pulses; otherwise at most PULSE_FPS updates a second. */
 export function startPulse(map: Map): () => void {
   let frame = 0;
+  let last = 0;
+  let shown = false;
   const step = (time: number) => {
-    if (map.getLayer(PULSE_LAYER)) {
-      const phase = (time % PULSE_MS) / PULSE_MS;
-      // ring grows 5 px per step of pulse (awaiting reply 5 px ... L3 20 px), fading out as it grows
-      map.setPaintProperty(PULSE_LAYER, 'circle-radius', ['+', ['get', 'radius'], ['*', phase * 5, ['get', 'pulse']]]);
-      map.setPaintProperty(PULSE_LAYER, 'circle-opacity', 0.55 * (1 - phase));
-    }
     frame = requestAnimationFrame(step);
+    if (!map.getLayer(PULSE_LAYER)) return;
+    if (!pulsing.get(map)) {
+      if (shown) map.setPaintProperty(PULSE_LAYER, 'circle-opacity', 0); // hide once, then stay idle
+      shown = false;
+      return;
+    }
+    if (time - last < 1000 / PULSE_FPS) return;
+    last = time;
+    shown = true;
+    const phase = (time % PULSE_MS) / PULSE_MS;
+    // ring grows 5 px per step of pulse (awaiting reply 5 px ... L3 20 px), fading out as it grows
+    map.setPaintProperty(PULSE_LAYER, 'circle-radius', ['+', ['get', 'radius'], ['*', phase * 5, ['get', 'pulse']]]);
+    map.setPaintProperty(PULSE_LAYER, 'circle-opacity', 0.55 * (1 - phase));
   };
   frame = requestAnimationFrame(step);
   return () => cancelAnimationFrame(frame);
