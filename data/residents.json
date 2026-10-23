@@ -41,14 +41,14 @@
         "insulin"
       ],
       "baseline_backup_hours": 12,
-      "lives_alone": false,
+      "lives_alone": true,
       "emergency_contact": {
         "name": "Marco Delgado",
         "relation": "son",
         "phone": "+14085550152",
         "language": "en"
       },
-      "notes": "Demo data. Keeps insulin pens in the fridge."
+      "notes": "Demo data. Keeps insulin pens in the fridge. Lives alone; her son checks in."
     },
     {
       "resident_id": "res-003",
