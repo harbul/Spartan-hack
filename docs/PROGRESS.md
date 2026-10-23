@@ -16,7 +16,7 @@
 ## Current status
 
 - **Current phase:** H6–H7 (plan renders), built offline while H0–H1 waits on AWS credentials. Next: H7–H8, the golden path on the deployed URL (needs AWS)
-- **Last updated:** 2026-10-23 05:21 UTC · Claude session
+- **Last updated:** 2026-10-23 19:30 UTC · Claude session
 - **Overall health:** 🟡 the whole MUST golden path is code-complete and tested without AWS (103 tests, plus the live UI against the real API with in-memory tables and stand-in Bedrock and Location). Nothing has run on real AWS yet (no credentials); that is now the only thing between us and the H7–H8 gate
 - **Gates:**
   - H0–H1 "Deployed URL returns a Bedrock reply; 3D path chosen" · ⬜ not met (no AWS credentials). 3D path chosen provisionally (Amazon `Terrain3D`)
@@ -138,6 +138,17 @@ Newest entry on top. Template:
 **Next steps:** (who does what next)
 - ...
 ```
+
+### 2026-10-23 · H8–H12 · Review of PR #12 and two fixes
+**By:** Claude session · **Branch/PR:** [`claude/focused-einstein-cqibah`](https://github.com/harbul/Spartan-hack/compare/main...neels22:Spartan-hack:claude/focused-einstein-cqibah)
+**Done:**
+- Reviewed PR #12 (3D map, fly-to, pulse, About panel, Guardrails) on a copy of `main`: `pytest` 116 passed, type-check, `vite build`, `cfn-lint` ok, no log entries lost. Design is sound.
+- [`residentsLayer.ts`](../frontend/src/components/map/layers/residentsLayer.ts): the pulse changed a paint property on every frame, even with nothing pulsing, so MapLibre redrew the 3D terrain nonstop. Now it idles when no marker pulses and updates at most 20 times a second. Headless (software rendering) 3D with no pulsing went from 2 to 28 fps.
+- [`main.py`](../backend/app/main.py): `screen_reply()` (advice guardrail) ran before Job 2 without a guard, so a guardrail error would have failed every reply and lost the message. It now logs and continues unscreened; new test in `test_flow.py`.
+- Checks: `pytest` 117 passed, `npm run build` ok.
+**Blockers / risks:**
+- 3D with pulsing markers is still very slow under software rendering (about 1 fps headless). Real GPUs should be fine, but test the recording machine before H15; if 3D stutters, record in 2D or at 1× terrain (§16).
+- PII masking makes one ApplyGuardrail call per Bedrock call, including each Job 5 agent turn. See Open questions.
 
 ### 2026-10-23 · H8–H12 · 3D map, fly-to, pulse, About panel, Guardrails (offline)
 **By:** Claude session · **Branch/PR:** `feat/should-tier`
@@ -419,4 +430,6 @@ From H0–H1 (2026-10-23):
 - [ ] **3D buildings height:** the extrusion reads the `height` property of the `buildings` tile layer, with 6 m if it's missing. Check on `/3d-test` with the key. If all buildings look the same height, drop buildings and keep terrain. (P1)
 - [ ] **Sources to verify:** open every link in `docs/sources.md`, read the Santa Clara County emPOWER number off the live map, and find a confirmed outage-related harm (the 2019 El Dorado County case was ruled not outage-caused). (P4)
 - [ ] **`/demo/reset` response:** returns `null` (§8 says n/a). Fine for the Reset button? (P1, P2)
+- [ ] **PII masking vs the agent's 20 s budget:** `mask_pii()` calls ApplyGuardrail inside every `converse()`, so each Job 5 turn waits for one more round trip, and long agent transcripts may exceed ApplyGuardrail's text limit (it then masks phones only). Time `/plans` at H0; if it nears 20 s, mask after the turn returns or mask only the newest message. (P3)
+- [ ] **3D on the recording machine:** check 3D with pulsing markers stays smooth on the machine that records the video; otherwise record in 2D or at 1× terrain. (P1, P4)
 - [ ] **Worker file type on Amplify:** the MapLibre worker ships as `assets/maplibre-gl-worker-*.mjs`. If the deployed map is blank with a MIME-type error, add a `Content-Type: text/javascript` custom header for `*.mjs`. (P1, P2)

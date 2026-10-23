@@ -213,3 +213,20 @@ def test_plan_approve_and_mark_done(api, monkeypatch):
     assert by_id(dash)["res-005"]["status"] == "resolved"
     assert [e["type"] for e in dash["events"]][-3:] == ["plan_drafted", "plan_approved", "stop_done"]
     assert client.get("/runs/run-nope").status_code == 404
+
+
+def test_a_failing_guardrail_never_loses_a_reply(api, monkeypatch):
+    def broken(text):
+        raise RuntimeError("guardrail throttled")
+
+    monkeypatch.setattr(bedrock, "screen_reply", broken)
+    client.post("/demo/reset")
+    outage = client.post("/outages", json={
+        "name": "East San Jose PSPS", "polygon": ZONE,
+        "starts_at": escalation.iso(T0), "est_restore_at": escalation.iso(T0 + timedelta(hours=14)),
+    }).json()
+    client.post(f"/outages/{outage['outage_id']}/checkins")
+    client.post("/clock/advance", json={"minutes": 10})  # the frozen test clock would give both messages one key
+    case = reply("res-002")  # asserts 200
+    assert case["status"] == "needs_help" and case["last_inbound_at"]
+    assert [m["direction"] for m in client.get("/residents/res-002/messages").json()["messages"]] == ["out", "in"]
