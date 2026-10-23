@@ -234,6 +234,17 @@ except ZoneInfoNotFoundError:  # no tz database: PDT is right for the October de
     PACIFIC = timezone(timedelta(hours=-7), "PDT")
 
 
+def depends_on(resident: Resident) -> str:
+    """The only word SMS jobs get about a resident's devices (privacy, §4 Job 1)."""
+    return "medicine" if set(resident.devices) == {"insulin"} else "equipment"
+
+
+def with_stop_line(text: str) -> str:
+    """Every resident-facing SMS carries the opt-out; a hard rule, not a model preference."""
+    text = text.strip().strip('"')
+    return text if "STOP" in text else f"{text} Reply STOP to opt out."
+
+
 def first_name(resident: Resident) -> str:
     """Given name. Vietnamese names put it last (Trần Văn Minh -> Minh)."""
     parts = resident.name.split()
@@ -254,7 +265,7 @@ def _tool_input(result: ConverseResult, name: str) -> dict[str, Any]:
     raise ValueError(f"model did not call {name} (stop reason: {result.stop_reason})")
 
 
-def _image_format(data: bytes) -> str:
+def image_format(data: bytes) -> str:
     if data.startswith(b"\x89PNG"):
         return "png"
     if data[:3] == b"GIF":
@@ -275,7 +286,7 @@ def write_checkin(resident: Resident, outage: Outage) -> JobResult[str]:
     facts = {
         "first_name": first_name(resident),
         "language": LANGUAGE_NAMES[resident.language],
-        "depends_on": "medicine" if set(resident.devices) == {"insulin"} else "equipment",
+        "depends_on": depends_on(resident),
         "power_off": local_time(outage.starts_at),
         "power_back_estimate": local_time(outage.est_restore_at),
     }
@@ -286,10 +297,7 @@ def write_checkin(resident: Resident, outage: Outage) -> JobResult[str]:
         max_tokens=300,
         temperature=0.3,
     )
-    text = result.text.strip().strip('"')
-    if "STOP" not in text:  # the opt-out line is a hard rule, not a model preference
-        text += " Reply STOP to opt out."
-    return JobResult(text, result.trace_id)
+    return JobResult(with_stop_line(result.text), result.trace_id)
 
 
 def write_checkins(
@@ -321,7 +329,7 @@ def assess_reply(
     }
     content: list[dict[str, Any]] = [{"text": json.dumps(facts, ensure_ascii=False)}]
     if image_bytes:
-        content.append({"image": {"format": _image_format(image_bytes), "source": {"bytes": image_bytes}}})
+        content.append({"image": {"format": image_format(image_bytes), "source": {"bytes": image_bytes}}})
     result = converse(
         "assess",
         load_prompt("assess"),
@@ -338,14 +346,98 @@ def assess_reply(
 # --- Job 3: triage explainer (fast model) -----------------------------------
 
 
-def explain_priority(breakdown: ScoreBreakdown, assessment: Assessment | None) -> str:
-    """One sentence for the coordinator explaining the score."""
-    ...
+def explain_priority(
+    breakdown: ScoreBreakdown, assessment: Assessment | None, resident: Resident
+) -> JobResult[str]:
+    """One sentence for the coordinator explaining the score. Dashboard only, so it may name devices."""
+    parts = breakdown.model_dump(exclude={"total", "status_ok_multiplier"})
+    facts = {
+        "resident": {
+            "first_name": first_name(resident),
+            "age": resident.age,
+            "devices": resident.devices,
+            "lives_alone": resident.lives_alone,
+            "baseline_backup_hours": resident.baseline_backup_hours,
+        },
+        "score_parts": {k: v for k, v in parts.items() if v},
+        "said_they_are_ok": breakdown.status_ok_multiplier < 1,
+        "reply": None
+        if assessment is None
+        else {
+            "english_translation": assessment.english_translation,
+            "needs": assessment.needs,
+            "supply_hours_left": assessment.supply_hours_left,
+            "needs_transport": assessment.needs_transport,
+            "distress_level": assessment.distress_level,
+        },
+    }
+    result = converse(
+        "explain",
+        load_prompt("explain"),
+        [{"role": "user", "content": [{"text": json.dumps(facts, ensure_ascii=False)}]}],
+        max_tokens=120,
+        temperature=0.2,
+    )
+    return JobResult(result.text.strip().strip('"'), result.trace_id)
 
 
 # --- Job 4: escalation drafter (fast model) ---------------------------------
 
 
-def draft_escalation(resident: Resident, case: Case, level: int) -> Escalation:
-    """L1 simpler re-ping, L2 emergency-contact message, L3 door-knock note."""
-    ...
+CHANNELS = {1: "sms", 2: "contact", 3: "door"}
+
+
+def _bring(resident: Resident) -> list[str]:
+    """What a door-knock volunteer brings, decided in code so the model can't invent kit."""
+    items = ["printed resource center info", "phone to call 911 if they are in danger"]
+    if "insulin" in resident.devices:
+        items.insert(0, "cooler with ice")
+    if set(resident.devices) - {"insulin"}:
+        items.insert(0, "charged battery pack")
+    return items
+
+
+def draft_escalation(resident: Resident, case: Case, level: int) -> JobResult[Escalation]:
+    """L1 simpler re-ping, L2 emergency-contact message, L3 door-knock note.
+
+    L1 and L2 are SMS: like Job 1, the model never sees the devices.
+    """
+    silent_since = local_time(case.last_outbound_at) if case.last_outbound_at else "this evening"
+    contact = resident.emergency_contact
+    if level == 1:
+        facts = {
+            "level": 1,
+            "first_name": first_name(resident),
+            "language": LANGUAGE_NAMES[resident.language],
+        }
+    elif level == 2:
+        facts = {
+            "level": 2,
+            "contact_first_name": contact.name.split()[-1] if contact.language == "vi" else contact.name.split()[0],
+            "language": LANGUAGE_NAMES[contact.language],
+            "resident_first_name": first_name(resident),
+            "silent_since": silent_since,
+            "depends_on": depends_on(resident),
+        }
+    else:
+        facts = {
+            "level": 3,
+            "first_name": first_name(resident),
+            "age": resident.age,
+            "devices": resident.devices,
+            "lives_alone": resident.lives_alone,
+            "speaks": LANGUAGE_NAMES[resident.language],
+            "silent_since": silent_since,
+            "emergency_contact": f"{contact.name} ({contact.relation}), already texted",
+            "bring": _bring(resident),
+        }
+    result = converse(
+        "escalate",
+        load_prompt("escalate"),
+        [{"role": "user", "content": [{"text": json.dumps(facts, ensure_ascii=False)}]}],
+        max_tokens=300,
+        temperature=0.3,
+    )
+    text = with_stop_line(result.text) if level < 3 else result.text.strip()
+    escalation = Escalation(resident_id=resident.resident_id, level=level, channel=CHANNELS[level], text=text)
+    return JobResult(escalation, result.trace_id)

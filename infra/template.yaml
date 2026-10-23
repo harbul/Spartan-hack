@@ -1,5 +1,5 @@
 # StillHere SAM template: Lambda (FastAPI + Mangum), HTTP API, DynamoDB tables,
-# photo bucket, EventBridge Scheduler escalation check (off until H4-H6), IAM,
+# photo bucket, EventBridge Scheduler escalation check, IAM,
 # and the browser map API key.
 # Deploy from infra/: `sam build && sam deploy --guided`.
 # Amplify Hosting (frontend) is connected to the repo in the console, not here.
@@ -83,12 +83,12 @@ Resources:
             ApiId: !Ref HttpApi
             Path: /{proxy+}
             Method: ANY
-        # TODO(P2, §5): turn on with the escalation check. Until main.handler routes
-        # scheduled events, this would fail every minute.
-        # EscalationCheck:
-        #   Type: ScheduleV2 # EventBridge Scheduler
-        #   Properties:
-        #     ScheduleExpression: rate(1 minute)
+        # Real-time silence check (PLAN.md §5); main.handler routes this Input.
+        EscalationCheck:
+          Type: ScheduleV2 # EventBridge Scheduler
+          Properties:
+            ScheduleExpression: rate(1 minute)
+            Input: '{"stillhere": "escalation_check"}'
       Policies:
         - DynamoDBCrudPolicy: { TableName: !Ref ResidentsTable }
         - DynamoDBCrudPolicy: { TableName: !Ref OutagesTable }
@@ -205,12 +205,13 @@ Resources:
     Properties:
       TableName: !Sub ${AWS::StackName}-events
       BillingMode: PAY_PER_REQUEST
+      # Sort key "<ts>#<write order>": many events can share a virtual timestamp.
       AttributeDefinitions:
         - { AttributeName: outage_id, AttributeType: S }
-        - { AttributeName: ts, AttributeType: S }
+        - { AttributeName: sk, AttributeType: S }
       KeySchema:
         - { AttributeName: outage_id, KeyType: HASH }
-        - { AttributeName: ts, KeyType: RANGE }
+        - { AttributeName: sk, KeyType: RANGE }
 
   ConfigTable:
     Type: AWS::DynamoDB::Table

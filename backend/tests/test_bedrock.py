@@ -1,4 +1,4 @@
-"""Unit tests for bedrock.py (converse, tracing, Jobs 1-2) with a stubbed bedrock-runtime client.
+"""Unit tests for bedrock.py (converse, tracing, Jobs 1-4) with a stubbed bedrock-runtime client.
 
 Implements: PLAN.md §4 (converse wrapper), §13 H0-H1.
 Owner: P3 (AI).
@@ -11,8 +11,8 @@ import pytest
 from botocore.stub import ANY, Stubber
 from eval_replies import privacy_violations  # tests/ is on sys.path under pytest
 
-from app import bedrock, store
-from app.schemas import Outage, Resident
+from app import bedrock, store, triage
+from app.schemas import Case, Outage, Resident
 from app.tools import RECORD_ASSESSMENT
 
 FAST = "test.fast-model-v1:0"
@@ -217,3 +217,51 @@ def test_assess_reply_without_the_tool_call_is_an_error(stub):
     stub.add_response("converse", reply("I think they are fine"), None)
     with pytest.raises(ValueError, match="record_assessment"):
         bedrock.assess_reply(RESIDENTS["res-004"], "Hi Denise...", "all good")
+
+
+# --- Job 3: triage explainer ----------------------------------------------------------
+
+def sent_facts(call):
+    return json.loads(call["messages"][0]["content"][0]["text"])
+
+
+def test_explain_sends_only_parts_that_apply(fake_converse):
+    lupe = RESIDENTS["res-005"]
+    breakdown = triage.score(lupe, None, 11.5, 150, 1.5)
+    result = bedrock.explain_priority(breakdown, None, lupe)
+    facts = sent_facts(fake_converse[0])
+    assert facts["score_parts"] == {"device_weight": 40, "time_pressure": 30, "alone": 10, "silence": 25}
+    assert facts["reply"] is None and fake_converse[0]["job"] == "explain"
+    assert result.output == "Chào Minh, đây là Quận Santa Clara." and result.trace_id == "tr-1"
+
+
+# --- Job 4: escalation drafter --------------------------------------------------------
+
+def silent_case(resident_id):
+    return Case(outage_id="out-1", resident_id=resident_id, status="awaiting_reply", priority=0, band="OK",
+                last_outbound_at="2026-10-24T01:00:00Z")
+
+
+def test_escalation_sms_never_sends_device_words(fake_converse):
+    for resident in RESIDENTS.values():
+        for level in (1, 2):
+            bedrock.draft_escalation(resident, silent_case(resident.resident_id), level)
+    assert len(fake_converse) == 80
+    for call in fake_converse:
+        assert privacy_violations(call["messages"][0]["content"][0]["text"]) == []
+
+
+def test_escalation_levels(fake_converse):
+    lupe = RESIDENTS["res-005"]
+    l1, l2, l3 = (bedrock.draft_escalation(lupe, silent_case("res-005"), level) for level in (1, 2, 3))
+    assert [e.output.channel for e in (l1, l2, l3)] == ["sms", "contact", "door"]
+    assert l1.output.text.endswith("Reply STOP to opt out.") and "STOP" not in l3.output.text
+
+    contact = sent_facts(fake_converse[1])
+    assert contact["language"] == "Spanish" and contact["contact_first_name"] == "Carmen"
+    assert contact["resident_first_name"] == "Lupe" and contact["silent_since"] == "6 PM"
+
+    door = sent_facts(fake_converse[2])
+    assert door["devices"] == ["oxygen"] and door["bring"][0] == "charged battery pack"
+    rosa_door = bedrock.draft_escalation(RESIDENTS["res-002"], silent_case("res-002"), 3)
+    assert sent_facts(fake_converse[3])["bring"][0] == "cooler with ice" and rosa_door.trace_id == "tr-1"

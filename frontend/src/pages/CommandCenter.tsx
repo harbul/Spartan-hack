@@ -7,12 +7,12 @@
  *   Bottom      action bar (Send check-ins -> Plan dispatch -> Approve) above timeline/Timeline
  * The top bar and action bar live in this page until they need their own file.
  *
- * Data: GET /dashboard every 3 s (api/client useDashboard; MOCK until H4-H6).
+ * Data: GET /dashboard every 3 s (api/client useDashboard; VITE_USE_MOCK=true for the mock).
  * Implements: PLAN.md §9.1. Owner: P1 (Frontend and UX).
  */
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
-import { apiGet, useDashboard } from '../api/client';
+import { USE_MOCK, apiGet, useDashboard, useMessages, useTraces } from '../api/client';
 import BedrockBadge from '../components/BedrockBadge';
 import IncidentMap from '../components/map/IncidentMap';
 import Overview from '../components/panels/Overview';
@@ -31,10 +31,27 @@ const TABS: { id: Tab; label: string }[] = [
 ];
 
 export default function CommandCenter() {
-  const { data, advance, reset, messages } = useDashboard();
+  const { data, error, busy, advance, reset, loadZone, sendCheckins } = useDashboard();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>('resident');
+  const messages = useMessages(selectedId, data);
+  const traces = useTraces();
+
+  if (!data) {
+    return (
+      <main className="flex h-screen items-center justify-center bg-[#f7f4ee] text-stone-600">
+        {error ? <ApiError error={error} /> : 'Loading the command center…'}
+      </main>
+    );
+  }
   const selected = data.cases.find((c) => c.resident_id === selectedId);
+  const toContact = data.cases.filter((c) => c.status === 'not_contacted').length;
+  const steps = [
+    { label: 'Load outage zone', onClick: loadZone, enabled: !data.outage },
+    { label: `Send check-ins${toContact ? ` (${toContact})` : ''}`, onClick: sendCheckins, enabled: toContact > 0 },
+    { label: 'Plan dispatch', onClick: () => {}, enabled: false }, // TODO(P1, H6-H7): POST /plans
+    { label: 'Approve plan', onClick: () => {}, enabled: false }, // TODO(P1, H6-H7): POST /plans/{id}/approve
+  ];
 
   const select = (residentId: string) => {
     setSelectedId(residentId);
@@ -50,14 +67,17 @@ export default function CommandCenter() {
           East San Jose foothills
           {data.outage && ` · power off ${clockTime(data.outage.starts_at)} to ~${clockTime(data.outage.est_restore_at)}`}
         </span>
-        <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">Demo data · mock</span>
-        <button onClick={reset} className="ml-auto rounded border border-stone-400 px-3 py-1 text-sm">
+        <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">
+          Demo data{USE_MOCK && ' · mock'}
+        </span>
+        <button onClick={reset} disabled={!!busy} className="ml-auto rounded border border-stone-400 px-3 py-1 text-sm">
           Reset demo
         </button>
         <button className="rounded px-2 py-1 text-sm text-stone-600" title="About StillHere (H8-H12)" disabled>
           About
         </button>
       </header>
+      {error && <ApiError error={error} />}
 
       <div className="grid min-h-0 flex-1 grid-cols-[340px_1fr_380px]">
         <aside className="flex min-h-0 flex-col border-r border-stone-300">
@@ -83,26 +103,40 @@ export default function CommandCenter() {
             ))}
           </nav>
           <div className="min-h-0 flex-1 overflow-y-auto">
-            {tab === 'resident' && (
-              <ResidentPanel dcase={selected} messages={selectedId ? messages(selectedId) : []} />
-            )}
-            {tab === 'trace' && <TraceDrawer />}
+            {tab === 'resident' && <ResidentPanel dcase={selected} messages={messages} />}
+            {tab === 'trace' && <TraceDrawer traces={traces} />}
             {tab === 'plan' && <PlanPanel />}
           </div>
         </aside>
       </div>
 
-      {/* TODO(P1, H4-H7): wire to POST /outages/{id}/checkins, /plans, /plans/{id}/approve. */}
       <div className="flex items-center gap-2 border-t border-stone-300 px-4 py-2 text-sm">
-        {['Send check-ins', 'Plan dispatch', 'Approve plan'].map((label, i) => (
-          <button key={label} disabled className="rounded bg-stone-800 px-3 py-1 text-white opacity-40">
-            {i + 1}. {label}
+        {steps.map((step, i) => (
+          <button
+            key={step.label}
+            onClick={step.onClick}
+            disabled={!step.enabled || !!busy}
+            className="rounded bg-stone-800 px-3 py-1 text-white disabled:opacity-40"
+          >
+            {i + 1}. {step.label}
           </button>
         ))}
-        <span className="text-xs text-stone-500">Actions call the API from H4-H6; the timeline drives the mock for now.</span>
+        {busy && (
+          <span className="flex items-center gap-2 text-xs text-stone-600">
+            <BedrockBadge /> {busy}
+          </span>
+        )}
       </div>
       <Timeline dashboard={data} onAdvance={advance} />
     </main>
+  );
+}
+
+function ApiError({ error }: { error: Error }) {
+  return (
+    <p className="border-b border-red-200 bg-red-50 px-4 py-1.5 text-sm text-red-800">
+      API problem: {error.message}. Check VITE_API_URL, or set VITE_USE_MOCK=true to work offline.
+    </p>
   );
 }
 
