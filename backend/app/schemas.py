@@ -346,5 +346,18 @@ class TracesResponse(BaseModel):
     traces: list[Trace]
 
 
+class RunStopDetail(BaseModel):
+    """What the volunteer's phone shows per stop, next to the Stop itself."""
+
+    resident_id: str
+    name: str
+    address: str
+    lat: float
+    lng: float
+    status: CaseStatus
+
+
 class RunResponse(BaseModel):
     run: Run
+    volunteer: Volunteer | None = None
+    stops_detail: list[RunStopDetail] = []  # same order as run.stops

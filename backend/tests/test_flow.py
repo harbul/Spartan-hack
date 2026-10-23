@@ -1,7 +1,8 @@
-"""The H4-H6 golden path through the API, on fake tables with stand-in Bedrock jobs:
-reset -> outage -> check-ins -> 4 hero replies -> +3 h -> dashboard.
+"""The golden path through the API, on fake tables with stand-in Bedrock jobs:
+reset -> outage -> check-ins -> 4 hero replies -> +3 h -> dashboard (H4-H6), then
+others reply -> plan -> approve -> route sheet -> stop done (H6-H7).
 
-Implements: PLAN.md §13 H4-H6 gate ("replies flow into the queue and onto the map"), §17.
+Implements: PLAN.md §13 H4-H6 and H6-H7 gates, §17.
 Owner: P2 (Backend and infra).
 """
 
@@ -12,7 +13,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from fastapi.testclient import TestClient
 
-from app import bedrock, escalation, main, store
+from app import agent, bedrock, escalation, location, main, store, tools
 from app.main import app
 from app.schemas import Assessment, Escalation
 
@@ -33,11 +34,12 @@ def api(tables, monkeypatch):
     })
 
     def assess(resident, last_outbound, text, image=None):
-        e = REPLIES[resident.resident_id]["expected"]
+        ok = {"status": "ok", "needs": [], "supply_hours_left": None, "needs_transport": False, "distress_level": 0}
+        e = REPLIES[resident.resident_id]["expected"] if resident.resident_id in REPLIES else ok
         return bedrock.JobResult(Assessment(
             status=e["status"], needs=e["needs"], supply_hours_left=e["supply_hours_left"],
             needs_transport=e["needs_transport"], distress_level=e["distress_level"],
-            detected_language=REPLIES[resident.resident_id]["language"], english_translation=f"EN: {text}",
+            detected_language=resident.language, english_translation=f"EN: {text}",
             key_quote=text, confidence=0.9, reasoning="",
         ), "tr-assess")
 
@@ -120,3 +122,61 @@ def test_scheduled_event_runs_the_check(api, monkeypatch):
     monkeypatch.setattr(main, "_tick", lambda outage_id: calls.append(outage_id) or [])
     assert main.handler(dict(main.SCHEDULED_EVENT), None) == {"escalations": 0}
     assert calls == ["out-x"]
+
+
+KEEP_SILENT = {"res-005", "res-025", "res-036"}  # same list as the phone simulator's "Others reply"
+
+
+class NoLocation:
+    def __getattr__(self, name):
+        def fail(**kwargs):
+            from botocore.exceptions import NoCredentialsError
+
+            raise NoCredentialsError()
+
+        return fail
+
+
+def test_plan_approve_and_mark_done(api, monkeypatch):
+    tools._route.cache_clear()
+    monkeypatch.setattr(location, "_client", lambda: NoLocation())
+    monkeypatch.setattr(agent, "plan_dispatch", lambda outage_id: agent.greedy_plan(outage_id, "stand-in"))
+    client.post("/demo/reset")
+    outage = client.post("/outages", json={
+        "name": "East San Jose PSPS", "polygon": ZONE,
+        "starts_at": escalation.iso(T0), "est_restore_at": escalation.iso(T0 + timedelta(hours=14)),
+    }).json()
+    assert client.post("/plans", json={"outage_id": outage["outage_id"]}).status_code == 409  # nothing open yet
+    client.post(f"/outages/{outage['outage_id']}/checkins")
+    client.post("/clock/advance", json={"minutes": 10})
+    for rid in PHONES:  # heroes and everyone else reply, except the ones kept silent
+        if rid not in KEEP_SILENT:
+            client.post("/inbound", json={"phone": PHONES[rid], "text": REPLIES.get(rid, {"text": "1"})["text"]})
+    client.post("/clock/advance", json={"minutes": 180})
+
+    plan = client.post("/plans", json={"outage_id": outage["outage_id"]}).json()["plan"]
+    stops = {s["resident_id"]: s for run in plan["runs"] for s in run["stops"]}
+    assert plan["status"] == "draft" and plan["uncovered"] == [] and len(stops) <= 18
+    assert KEEP_SILENT <= set(stops) and stops["res-005"]["action"] == "door_knock"
+    assert stops["res-001"]["action"] == "battery" and stops["res-003"]["action"] == "ride"
+    assert all(len(run["stops"]) <= 6 and run["geometry"]["type"] == "LineString" for run in plan["runs"])
+    assert client.get("/dashboard").json()["plan"]["plan_id"] == plan["plan_id"]
+
+    lupe_run = next(r for r in plan["runs"] if any(s["resident_id"] == "res-005" for s in r["stops"]))
+    done_url = f"/runs/{lupe_run['run_id']}/stops/res-005/done"
+    assert client.post(done_url).status_code == 409  # not approved yet
+
+    approved = client.post(f"/plans/{plan['plan_id']}/approve").json()["plan"]
+    assert approved["status"] == "approved"
+    cases = by_id(client.get("/dashboard").json())
+    assert all(cases[rid]["status"] == "dispatched" for rid in stops)
+
+    sheet = client.get(f"/runs/{lupe_run['run_id']}").json()
+    assert sheet["volunteer"]["volunteer_id"] == lupe_run["volunteer"]
+    assert [d["resident_id"] for d in sheet["stops_detail"]] == [s["resident_id"] for s in lupe_run["stops"]]
+
+    assert client.post(done_url).json()["case"]["status"] == "resolved"
+    dash = client.get("/dashboard").json()
+    assert by_id(dash)["res-005"]["status"] == "resolved"
+    assert [e["type"] for e in dash["events"]][-3:] == ["plan_drafted", "plan_approved", "stop_done"]
+    assert client.get("/runs/run-nope").status_code == 404

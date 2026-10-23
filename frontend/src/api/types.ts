@@ -308,6 +308,17 @@ export interface TracesResponse {
   traces: Trace[];
 }
 
+export interface RunStopDetail {
+  resident_id: string;
+  name: string;
+  address: string;
+  lat: number;
+  lng: number;
+  status: CaseStatus;
+}
+
 export interface RunResponse {
   run: Run;
+  volunteer: Volunteer | null;
+  stops_detail: RunStopDetail[]; // same order as run.stops
 }
