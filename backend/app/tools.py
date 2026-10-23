@@ -59,6 +59,12 @@ RECORD_ASSESSMENT: dict[str, Any] = {
 
 MAX_STOPS = 6  # per volunteer (§4 Job 5)
 COVER_PRIORITY = 60  # every case at or above this should be in a run
+
+
+def must_cover(case: dict) -> bool:
+    """Priority 60+ (§4 Job 5), and every silent (L3) case: a door-knock in the next plan (§5)."""
+    return case["priority"] >= COVER_PRIORITY or case["status"] == "silent"
+
 OPEN_STATUSES = ("needs_help", "escalated", "silent")
 ACTIONS = list(get_args(StopAction))
 
@@ -241,14 +247,14 @@ def submit_plan(outage_id: str, runs: list[dict[str, Any]], summary: str, trace_
                 covered.append(rid)
             if stop.get("action") not in ACTIONS:
                 problems.append(f"{rid}: action must be one of {ACTIONS}")
-    uncovered = [c for c in cases.values() if c["priority"] >= COVER_PRIORITY and c["resident_id"] not in covered]
+    uncovered = [c for c in cases.values() if must_cover(c) and c["resident_id"] not in covered]
     if any(c["band"] == "Critical" for c in uncovered) and any(cases[r]["band"] != "Critical" for r in covered if r in cases):
         problems.append("a Critical case is left out while a lower-priority case is covered: cover Critical first")
     spare = sum(MAX_STOPS - len(r.get("stops") or []) for r in runs if r.get("volunteer_id") in volunteers)
     spare += MAX_STOPS * len(set(volunteers) - used_volunteers)
     if uncovered and spare > 0:
         problems.append(
-            f"{len(uncovered)} case(s) with priority >= {COVER_PRIORITY} are not covered but there is room for "
+            f"{len(uncovered)} case(s) with priority >= {COVER_PRIORITY} or silent are not covered but there is room for "
             f"{spare} more stop(s): {', '.join(c['resident_id'] for c in uncovered)}"
         )
     if problems:

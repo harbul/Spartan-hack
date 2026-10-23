@@ -5,43 +5,28 @@
  * "Others reply" sends every non-hero reply (the other test replies plus
  * data/crowd_replies.json) so only Lupe and three others stay silent (§3).
  *
- * "Others reply (demo)" sends everyone else's reply through the same /inbound, so
- * only the heroes and a few chosen residents stay silent (simulated residents,
- * real processing). With VITE_USE_MOCK=true, sending only adds to this page.
+ * With VITE_USE_MOCK=true, sending only adds the reply to this page.
  *
  * Data: GET /residents/{id}/messages, POST /inbound.
  * Implements: PLAN.md §9.2, §6 (SMS channel). Owner: P1 (Frontend and UX).
  */
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { USE_MOCK, apiGet, sendInbound, useMessages } from '../api/client';
-import { residents, testReplies } from '../api/seed';
-import type { DashboardResponse, Message } from '../api/types';
+import { USE_MOCK, sendInbound, useMessages } from '../api/client';
+import { crowdReplies, residents, testReplies } from '../api/seed';
+import type { Message } from '../api/types';
 import { LANGUAGE_LABEL, clockTime } from '../components/status';
 
 const MAX_PHOTO_BYTES = 1_000_000; // Lambda payload limit (§16)
-const HEROES = new Set(['res-001', 'res-002', 'res-003', 'res-004', 'res-005']); // replied by hand on camera
-const KEEP_SILENT = new Set(['res-005', 'res-025', 'res-036']); // Lupe and two more never answer
-const BATCH = 4;
+const OTHERS_PARALLEL = 6; // each reply runs Jobs 2 and 3; one at a time would take minutes
 
-/** Send the labeled test reply (or "1") for everyone who hasn't answered yet. */
-async function othersReply(onProgress: (done: number, total: number) => void): Promise<number> {
-  const dashboard = await apiGet<DashboardResponse>('/dashboard');
-  const pending = dashboard.cases.filter(
-    (c) => !c.last_inbound_at && c.status !== 'not_contacted' && !HEROES.has(c.resident_id) && !KEEP_SILENT.has(c.resident_id),
-  );
-  let done = 0;
-  for (let i = 0; i < pending.length; i += BATCH) {
-    await Promise.all(
-      pending.slice(i, i + BATCH).map(async (c) => {
-        const labeled = testReplies.find((r) => r.resident_id === c.resident_id);
-        await sendInbound({ phone: c.resident.phone, text: labeled?.text ?? '1' });
-        onProgress(++done, pending.length);
-      }),
-    );
-  }
-  return pending.length;
-}
+// Heroes reply by hand on camera (§3); Lupe (res-005) never replies. Text only: the photo files aren't in data/ yet.
+const HEROES = new Set(['res-001', 'res-002', 'res-003', 'res-004', 'res-005']);
+const othersReplies = [...testReplies, ...crowdReplies]
+  .filter((r) => !HEROES.has(r.resident_id))
+  .map((r) => ({ phone: residents.find((x) => x.resident_id === r.resident_id)!.phone, text: r.text }));
+
+type OthersProgress = { done: number; failed: number } | null;
 
 /** Downscale to 1280 px and re-encode as JPEG until the base64 payload is under 1 MB. */
 async function resizePhoto(file: File): Promise<string> {
@@ -65,20 +50,9 @@ export default function Phone() {
   const [photo, setPhoto] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
-  const [others, setOthers] = useState<string | null>(null);
+  const [others, setOthers] = useState<OthersProgress>(null);
+  const [othersError, setOthersError] = useState<string | null>(null);
   const queryClient = useQueryClient();
-
-  const runOthers = async () => {
-    setError(null);
-    try {
-      const total = await othersReply((done, of) => setOthers(`Amazon Bedrock is reading replies: ${done} / ${of}`));
-      setOthers(total ? `${total} residents replied` : 'Everyone else has already replied');
-      await queryClient.invalidateQueries();
-    } catch (err) {
-      setOthers(null);
-      setError((err as Error).message);
-    }
-  };
 
   const resident = residents.find((r) => r.resident_id === residentId)!;
   const fromApi = useMessages(residentId).filter((m) => m.channel === 'sms'); // the resident's phone sees SMS only
@@ -220,21 +194,30 @@ export default function Phone() {
       </div>
 
       <aside className="w-80">
-        {!USE_MOCK && (
-          <div className="mb-4 rounded border border-stone-300 bg-white p-3 text-sm">
-            <button
-              onClick={runOthers}
-              disabled={!!others?.includes('/')}
-              className="rounded bg-stone-800 px-3 py-1 text-white disabled:opacity-50"
-            >
-              Others reply (demo)
-            </button>
-            <p className="mt-1 text-xs text-stone-500">
-              {others ??
-                'Sends every other resident\'s reply (test reply or "1") through /inbound, so only the heroes and 3 chosen residents stay silent.'}
+        <section className="mb-4 rounded border border-stone-200 bg-white p-3">
+          <h2 className="mb-1 font-semibold">Everyone else</h2>
+          <p className="mb-2 text-xs text-stone-500">
+            Sends the other {othersReplies.length} residents' replies (test replies plus simple OKs from
+            data/crowd_replies.json) through /inbound, so only Lupe and three others stay silent. Use after check-ins,
+            before moving the clock.{USE_MOCK && ' Mock: the mock dashboard already includes these replies.'}
+          </p>
+          <button
+            onClick={sendOthers}
+            disabled={USE_MOCK || othersRunning}
+            className="rounded bg-stone-800 px-3 py-1.5 text-sm text-white disabled:opacity-50"
+          >
+            Others reply
+          </button>
+          {others && (
+            <p className="mt-2 text-xs text-stone-600">
+              {othersRunning
+                ? `Amazon Bedrock is reading replies… ${others.done}/${othersReplies.length}`
+                : `${others.done - others.failed}/${othersReplies.length} replies sent`}
+              {others.failed > 0 && <span className="text-red-600"> · {others.failed} failed: {othersError}</span>}
             </p>
-          </div>
-        )}
+          )}
+        </section>
+
         <h2 className="mb-1 font-semibold">Quick replies</h2>
         <p className="mb-2 text-xs text-stone-500">
           From data/test_replies.json. This resident's replies come first. Sending posts to the same /inbound webhook

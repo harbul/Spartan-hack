@@ -114,3 +114,13 @@ def test_greedy_overflow_becomes_the_next_wave(world):
     assert len(plan.uncovered) == 11
     priority = {c["resident_id"]: c["priority"] for c in tools.list_open_cases("out-1")}
     assert max(priority[r] for r in plan.uncovered) <= min(priority[r] for r in covered)
+
+
+def test_a_silent_case_is_covered_whatever_its_priority(world):
+    put("res-039", "silent", 50, "Watch")  # §5: L3 means a door-knock in the next plan
+    plan = agent.greedy_plan("out-1")
+    assert {s.resident_id: s.action for r in plan.runs for s in r.stops}["res-039"] == "door_knock"
+    with pytest.raises(tools.PlanError) as err:
+        tools.submit_plan("out-1", [{"volunteer_id": "vol-1", "stops": [
+            stop("res-005"), stop("res-001", "battery"), stop("res-002", "cooler"), stop("res-003", "ride")]}], "s")
+    assert any("res-039" in p for p in err.value.problems)

@@ -161,6 +161,6 @@ curl -X POST $API/runs/$RUN/stops/res-005/done            # Lupe's door-knock do
 
 The AI Trace tab should show one Job 5 row per agent turn. If the plan summary says "Fallback plan" or "straight lines", the agent or Amazon Location did not finish; the log says why.
 
-Or run it in the browser: `/` → Reset demo → 1. Load outage zone → 2. Send check-ins; on `/phone` send the 4 hero quick replies, then **Others reply (demo)** (everyone else answers through the real `/inbound`; Lupe and 2 more stay silent); back on `/`, +3 h → 3. Plan dispatch → 4. Approve plan → open a route sheet from the Plan tab and mark a stop done. Set `VITE_USE_MOCK=true` to work on the screens without an API.
+Or run it in the browser: `/` → Reset demo → 1. Load outage zone → 2. Send check-ins; on `/phone` send the 4 hero quick replies, then **Others reply** (the other test replies and `data/crowd_replies.json` go through the real `/inbound`; Lupe and 3 more stay silent); back on `/`, +3 h → 3. Plan dispatch → 4. Approve plan → open a route sheet from the Plan tab and mark a stop done. Set `VITE_USE_MOCK=true` to work on the screens without an API.
 
 Frontend: Amplify Hosting builds `frontend/` with [`amplify.yml`](amplify.yml). Connect the repo as a monorepo with root `frontend`, set `VITE_API_URL`, `VITE_LOCATION_API_KEY` and `VITE_LOCATION_REGION`, and add the SPA rewrite (`</^[^.]+$|\.(?!(css|gif|ico|jpg|js|mjs|png|txt|svg|woff|woff2|ttf|map|json|webp)$)([^.]+$)/>` → `/index.html`, 200) so `/phone` and `/run/:runId` deep links work.

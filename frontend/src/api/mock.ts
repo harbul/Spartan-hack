@@ -161,7 +161,7 @@ const ACTION_ITEMS: Record<Stop['action'], string[]> = {
 
 function mockPlan(cases: DashboardCase[], state: MockPlanState): Plan {
   const open = cases
-    .filter((c) => ['needs_help', 'escalated', 'silent'].includes(c.status) && c.priority >= 60)
+    .filter((c) => ['needs_help', 'escalated', 'silent'].includes(c.status) && (c.priority >= 60 || c.status === 'silent'))
     .sort((a, b) => b.priority - a.priority);
   const runs = volunteers.map((v, i) => ({ volunteer: v, stops: open.filter((_, j) => j % volunteers.length === i).slice(0, 6) }));
   return {
