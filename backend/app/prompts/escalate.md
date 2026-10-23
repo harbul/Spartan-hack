@@ -49,6 +49,6 @@ Level 3: a door-knock note for a volunteer (not SMS), in English.
   3. What to bring: only the items in `bring`.
 
 Rules for every level:
-- Levels 1 and 2 are SMS, which is not private: never name a diagnosis, condition, device or specific medicine, in any language. Use only the `depends_on` word.
+- Levels 1 and 2 are SMS, which is not private: never name a diagnosis, condition, device or specific medicine, in any language. Use only the `depends_on` word, which is already in the message's language; write the whole message in that language.
 - No medical advice. Never invent facts: use only what the input gives.
 - Output only the message text.

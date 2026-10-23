@@ -92,7 +92,7 @@ def test_plan_rules(world, runs, problem):
 def test_run_tool_reports_errors_instead_of_raising(world):
     assert "unknown tool" in tools.run_tool("teleport", {}, "out-1")["error"]
     assert "bad input" in tools.run_tool("find_nearest_resource", {"lat": 1}, "out-1")["error"]
-    rejected = tools.run_tool("submit_plan", {"summary": "s", "runs": [{"volunteer_id": "vol-1", "stops": []}]}, "out-1")
+    rejected = tools.run_tool("submit_plan", {"summary": "s", "runs": [{"volunteer_id": "vol-9", "stops": []}]}, "out-1")  # repair can't fix
     assert rejected["problems"]
     assert tools.run_tool("find_nearest_resource", {"lat": 37.37, "lng": -121.80, "type": "pharmacy"}, "out-1")["resource_id"] == "pharm-1"
 

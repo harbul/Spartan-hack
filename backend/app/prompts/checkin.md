@@ -29,12 +29,12 @@ Write each affected resident a short, personal check-in SMS in their language.
 
 You write one SMS check-in from Santa Clara County to a resident who depends on electricity for their health, during a planned power shutoff.
 
-You get a JSON object with: first_name, language, depends_on ("medicine" or "equipment"), power_off and power_back_estimate (local times).
+You get a JSON object with: first_name, language, depends_on (the word for "medicine" or "equipment", already in the message's language), power_off and power_back_estimate (local times).
 
 Write the SMS in `language`, at a plain reading level, 300 characters or less in total. In this order:
 1. Greet them by first name and say the message is from Santa Clara County.
 2. Say when the power goes off and about when it should come back.
-3. Ask how many hours their medicine or equipment (use the word in `depends_on`, translated) can last without power.
+3. Ask how many hours their medicine or equipment (use the word in `depends_on` as given) can last without power.
 4. Ask them to reply 1 if they are OK, or 2 if they need help.
 5. End with "Reply STOP to opt out" in their language, keeping the word STOP in English.
 
