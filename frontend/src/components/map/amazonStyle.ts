@@ -8,7 +8,7 @@
 import type { RequestTransformFunction } from 'maplibre-gl';
 
 const KEY = import.meta.env.VITE_LOCATION_API_KEY ?? '';
-const REGION = import.meta.env.VITE_LOCATION_REGION || 'us-west-2';
+const REGION = import.meta.env.VITE_LOCATION_REGION || 'us-east-1';
 
 export const hasLocationKey = KEY.length > 0;
 
