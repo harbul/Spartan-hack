@@ -5,17 +5,17 @@
 
 ## 1. Where we are
 
-**The whole MUST golden path and most of the SHOULD tier are built and tested offline. Nothing has run on AWS yet, and AWS credentials are the only blocker for the next gate.**
+**The whole MUST golden path and most of the SHOULD tier are built and tested offline. AWS credentials are here (`us-east-1` only), and Bedrock and Amazon Location answer in the event account, but nothing is deployed yet. The blocker for the next gate: the event account can't create IAM roles ([AWS_SETUP.md](AWS_SETUP.md#what-we-found-in-the-event-account-2026-10-23)).**
 
 Offline means 117 backend tests pass, `npm run build` passes, and the live UI was driven in a browser against the real API, with in-memory tables and stand-ins for Bedrock and Amazon Location.
 
 | Gate (PLAN.md §13) | Status |
 |---|---|
-| H0–H1 Deployed URL returns a Bedrock reply; 3D path chosen | Code done. **Needs AWS** (deploy) |
+| H0–H1 Deployed URL returns a Bedrock reply; 3D path chosen | Code done; Bedrock answers in the event account. **Needs the deploy** |
 | H1–H4 Each part works alone | Met offline. Needs AWS check |
 | H4–H6 Replies flow into the queue and onto the map | Met offline. Needs AWS check |
 | H6–H7 Plan renders | Met offline. Needs AWS check (agent on real Bedrock, real routes) |
-| **H7–H8 Golden path green on the deployed URL + safety video** | **Next. Blocked on AWS** |
+| **H7–H8 Golden path green on the deployed URL + safety video** | **Next. Blocked on the deploy (IAM, §4 step 3)** |
 | H8–H12 SHOULD tier | Mostly built: 3D map, fly-to, pulsing markers, About panel, Guardrails, review flag. Remaining in §5 below |
 
 The golden path in the app:
@@ -63,7 +63,7 @@ Owner: **P2**, with **P3** on steps 2, 6 and 7 and **P4** on step 8. **Every AWS
 Each item: the first step and where to work. "Done" means it works on the deployed URL and PROGRESS.md is ticked.
 
 ### P2 · Backend and infra
-- [ ] **The AWS gate (§4 above).** First step: credentials and `sam deploy`.
+- [ ] **The AWS gate (§4 above).** First step: ask the organizers to allow IAM role creation or to provide a Lambda role (exact ask in [AWS_SETUP.md §2](AWS_SETUP.md#2-deploy-the-stack)), then `sam deploy` in the matching mode. Without an answer, deploy with `DeployApi=false` and run the backend locally.
 - [ ] **Lock down public surfaces** once the Amplify URL exists:
   - CORS in `backend/app/main.py` and `infra/template.yaml` (`AllowOrigins`).
   - The map key's `AllowReferers` (`infra/template.yaml`, TODOs there).
@@ -113,7 +113,8 @@ Each item: the first step and where to work. "Done" means it works on the deploy
 ## 7. Decisions still open
 
 Full list with context in [PROGRESS.md → Open questions](PROGRESS.md#open-questions). The ones that block work:
-- Exact H0 time, AWS region, and the submission details (upload place, format, event channel).
+- IAM in the event account: role creation, or a Lambda role from the organizers? It picks the deploy mode (P2).
+- Exact H0 time and the submission details (upload place, format, event channel). The region is settled: `us-east-1`.
 - PROPOSED contract shapes (P1, P2, P3).
 - Photos committed as binaries? (P4, P3)
 - Amplify connects `main` only, or this branch too? (P2)
