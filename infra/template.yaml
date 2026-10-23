@@ -141,10 +141,12 @@ Resources:
             # TODO(P2, H6-H7): geo-routes:OptimizeWaypoints / CalculateRoutes for location.py.
 
   # --- DynamoDB tables (PLAN.md §7), all on-demand ---------------------------
+  # Named <stack>-<table> so local runs can use the .env.example names (stack `stillhere`).
 
   ResidentsTable:
     Type: AWS::DynamoDB::Table
     Properties:
+      TableName: !Sub ${AWS::StackName}-residents
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions: [{ AttributeName: resident_id, AttributeType: S }]
       KeySchema: [{ AttributeName: resident_id, KeyType: HASH }]
@@ -152,6 +154,7 @@ Resources:
   OutagesTable:
     Type: AWS::DynamoDB::Table
     Properties:
+      TableName: !Sub ${AWS::StackName}-outages
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions: [{ AttributeName: outage_id, AttributeType: S }]
       KeySchema: [{ AttributeName: outage_id, KeyType: HASH }]
@@ -159,6 +162,7 @@ Resources:
   CasesTable:
     Type: AWS::DynamoDB::Table
     Properties:
+      TableName: !Sub ${AWS::StackName}-cases
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - { AttributeName: outage_id, AttributeType: S }
@@ -170,6 +174,7 @@ Resources:
   MessagesTable:
     Type: AWS::DynamoDB::Table
     Properties:
+      TableName: !Sub ${AWS::StackName}-messages
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - { AttributeName: resident_id, AttributeType: S }
@@ -181,6 +186,7 @@ Resources:
   PlansTable:
     Type: AWS::DynamoDB::Table
     Properties:
+      TableName: !Sub ${AWS::StackName}-plans
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions: [{ AttributeName: plan_id, AttributeType: S }]
       KeySchema: [{ AttributeName: plan_id, KeyType: HASH }]
@@ -188,6 +194,7 @@ Resources:
   TracesTable:
     Type: AWS::DynamoDB::Table
     Properties:
+      TableName: !Sub ${AWS::StackName}-traces
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions: [{ AttributeName: trace_id, AttributeType: S }]
       KeySchema: [{ AttributeName: trace_id, KeyType: HASH }]
@@ -196,6 +203,7 @@ Resources:
   EventsTable:
     Type: AWS::DynamoDB::Table
     Properties:
+      TableName: !Sub ${AWS::StackName}-events
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - { AttributeName: outage_id, AttributeType: S }
@@ -207,6 +215,7 @@ Resources:
   ConfigTable:
     Type: AWS::DynamoDB::Table
     Properties:
+      TableName: !Sub ${AWS::StackName}-config
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions: [{ AttributeName: key, AttributeType: S }]
       KeySchema: [{ AttributeName: key, KeyType: HASH }]

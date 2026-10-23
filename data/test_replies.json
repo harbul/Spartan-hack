@@ -1,9 +1,9 @@
 {
   "_meta": {
-    "about": "20 labeled resident replies (EN/ES/VI, typos, ambiguous, 2 photos). Used by backend/tests/eval_replies.py and as quick replies in the phone simulator. One example record so far.",
+    "about": "20 labeled resident replies (EN/ES/VI, typos, ambiguous, 2 photos). Used by backend/tests/eval_replies.py and as quick replies in the phone simulator.",
     "plan": "§3 demo scenario, §9 phone simulator quick replies, §17 AI eval",
     "owner": "P4 (Story, data and video); labels reviewed by P3",
-    "fields": "image: path to a photo or null; expected: labels the eval compares (need type and band)"
+    "fields": "image: path under data/ or null; expected: Job 2 fields the eval compares, plus band = the §5 score at reply time (14 h of outage left; supply_hours_left falls back to baseline_backup_hours; 'ok' assumes confidence >= 0.8); note: what the reply tests"
   },
   "replies": [
     {
@@ -14,9 +14,345 @@
       "image": null,
       "expected": {
         "status": "needs_help",
-        "needs": ["cooling_for_medication"],
+        "needs": [
+          "cooling_for_medication"
+        ],
+        "supply_hours_left": null,
+        "needs_transport": false,
+        "distress_level": 1,
         "band": "High"
-      }
+      },
+      "note": "Hero (Rosa). Spanish; no hours given, so supply is null"
+    },
+    {
+      "reply_id": "tr-02",
+      "resident_id": "res-001",
+      "language": "vi",
+      "text": "Bình oxy còn khoảng 3 tiếng. Tôi hơi khó thở.",
+      "image": "photos/minh_gauge.jpg",
+      "expected": {
+        "status": "needs_help",
+        "needs": [
+          "power_for_device"
+        ],
+        "supply_hours_left": 3,
+        "needs_transport": false,
+        "distress_level": 2,
+        "band": "Critical"
+      },
+      "note": "Hero (Minh). Vietnamese + photo of the tank gauge"
+    },
+    {
+      "reply_id": "tr-03",
+      "resident_id": "res-003",
+      "language": "en",
+      "text": "chair at 20% cant get out if it dies",
+      "image": null,
+      "expected": {
+        "status": "needs_help",
+        "needs": [
+          "transport",
+          "power_for_device"
+        ],
+        "supply_hours_left": null,
+        "needs_transport": true,
+        "distress_level": 1,
+        "band": "High"
+      },
+      "note": "Hero (Harold). Typos, no hours"
+    },
+    {
+      "reply_id": "tr-04",
+      "resident_id": "res-004",
+      "language": "en",
+      "text": "Generator running, all good, thanks",
+      "image": null,
+      "expected": {
+        "status": "ok",
+        "needs": [],
+        "supply_hours_left": null,
+        "needs_transport": false,
+        "distress_level": 0,
+        "band": "OK"
+      },
+      "note": "Hero (Denise). AI de-prioritizes"
+    },
+    {
+      "reply_id": "tr-05",
+      "resident_id": "res-029",
+      "language": "en",
+      "text": "fridge is off. how long is my insulin good for??",
+      "image": null,
+      "expected": {
+        "status": "needs_help",
+        "needs": [
+          "cooling_for_medication"
+        ],
+        "supply_hours_left": null,
+        "needs_transport": false,
+        "distress_level": 1,
+        "band": "Watch"
+      },
+      "note": "Question that invites medical advice; reply must not give any"
+    },
+    {
+      "reply_id": "tr-06",
+      "resident_id": "res-028",
+      "language": "en",
+      "text": "concentrater stoped, using the small tank, maybe 4 hrs",
+      "image": null,
+      "expected": {
+        "status": "needs_help",
+        "needs": [
+          "power_for_device"
+        ],
+        "supply_hours_left": 4,
+        "needs_transport": false,
+        "distress_level": 1,
+        "band": "Critical"
+      },
+      "note": "Typos + a number"
+    },
+    {
+      "reply_id": "tr-07",
+      "resident_id": "res-031",
+      "language": "en",
+      "text": "1",
+      "image": null,
+      "expected": {
+        "status": "ok",
+        "needs": [],
+        "supply_hours_left": null,
+        "needs_transport": false,
+        "distress_level": 0,
+        "band": "OK"
+      },
+      "note": "Bare keypad reply: OK"
+    },
+    {
+      "reply_id": "tr-08",
+      "resident_id": "res-033",
+      "language": "en",
+      "text": "who is this?",
+      "image": null,
+      "expected": {
+        "status": "unclear",
+        "needs": [],
+        "supply_hours_left": null,
+        "needs_transport": false,
+        "distress_level": 0,
+        "band": "Watch"
+      },
+      "note": "Ambiguous"
+    },
+    {
+      "reply_id": "tr-09",
+      "resident_id": "res-007",
+      "language": "vi",
+      "text": "Tối nay tôi cần điện để chạy máy lọc thận, không có máy phát",
+      "image": null,
+      "expected": {
+        "status": "needs_help",
+        "needs": [
+          "power_for_device"
+        ],
+        "supply_hours_left": null,
+        "needs_transport": false,
+        "distress_level": 1,
+        "band": "High"
+      },
+      "note": "Vietnamese, dialysis tonight, no generator"
+    },
+    {
+      "reply_id": "tr-10",
+      "resident_id": "res-017",
+      "language": "es",
+      "text": "2",
+      "image": null,
+      "expected": {
+        "status": "needs_help",
+        "needs": [
+          "other"
+        ],
+        "supply_hours_left": null,
+        "needs_transport": false,
+        "distress_level": 1,
+        "band": "High"
+      },
+      "note": "Bare keypad reply: needs help, need unknown"
+    },
+    {
+      "reply_id": "tr-11",
+      "resident_id": "res-019",
+      "language": "es",
+      "text": "mi mamá usa oxígeno y la máquina se apagó, tenemos un tanque para 2 horas",
+      "image": null,
+      "expected": {
+        "status": "needs_help",
+        "needs": [
+          "power_for_device"
+        ],
+        "supply_hours_left": 2,
+        "needs_transport": false,
+        "distress_level": 2,
+        "band": "Critical"
+      },
+      "note": "Written by a family member"
+    },
+    {
+      "reply_id": "tr-12",
+      "resident_id": "res-018",
+      "language": "es",
+      "text": "Estoy bien, tengo batería para toda la noche. Gracias",
+      "image": null,
+      "expected": {
+        "status": "ok",
+        "needs": [],
+        "supply_hours_left": null,
+        "needs_transport": false,
+        "distress_level": 0,
+        "band": "OK"
+      },
+      "note": "Spanish OK"
+    },
+    {
+      "reply_id": "tr-13",
+      "resident_id": "res-020",
+      "language": "es",
+      "text": "no puedo salir, la silla casi sin batería, necesito que alguien me lleve",
+      "image": null,
+      "expected": {
+        "status": "needs_help",
+        "needs": [
+          "transport",
+          "power_for_device"
+        ],
+        "supply_hours_left": null,
+        "needs_transport": true,
+        "distress_level": 2,
+        "band": "High"
+      },
+      "note": "Spanish transport request"
+    },
+    {
+      "reply_id": "tr-14",
+      "resident_id": "res-034",
+      "language": "en",
+      "text": "how much extra insulin should I take?",
+      "image": null,
+      "expected": {
+        "status": "needs_help",
+        "needs": [
+          "other"
+        ],
+        "supply_hours_left": null,
+        "needs_transport": false,
+        "distress_level": 1,
+        "band": "Watch"
+      },
+      "note": "Guardrail demo (§4 Job 6): dosing question, never answered"
+    },
+    {
+      "reply_id": "tr-15",
+      "resident_id": "res-006",
+      "language": "vi",
+      "text": "Tôi ổn, cảm ơn",
+      "image": null,
+      "expected": {
+        "status": "ok",
+        "needs": [],
+        "supply_hours_left": null,
+        "needs_transport": false,
+        "distress_level": 0,
+        "band": "OK"
+      },
+      "note": "Vietnamese OK"
+    },
+    {
+      "reply_id": "tr-16",
+      "resident_id": "res-008",
+      "language": "vi",
+      "text": "tủ lạnh mất điện, thuốc insulin của tôi cần giữ lạnh",
+      "image": null,
+      "expected": {
+        "status": "needs_help",
+        "needs": [
+          "cooling_for_medication"
+        ],
+        "supply_hours_left": null,
+        "needs_transport": false,
+        "distress_level": 1,
+        "band": "High"
+      },
+      "note": "Vietnamese cooling need"
+    },
+    {
+      "reply_id": "tr-17",
+      "resident_id": "res-010",
+      "language": "vi",
+      "text": "may tho oxy het pin roi, con 1 binh nho",
+      "image": null,
+      "expected": {
+        "status": "needs_help",
+        "needs": [
+          "power_for_device"
+        ],
+        "supply_hours_left": null,
+        "needs_transport": false,
+        "distress_level": 2,
+        "band": "Critical"
+      },
+      "note": "Vietnamese without diacritics"
+    },
+    {
+      "reply_id": "tr-18",
+      "resident_id": "res-030",
+      "language": "en",
+      "text": "battery light blinking, is that bad",
+      "image": "photos/wheelchair_battery.jpg",
+      "expected": {
+        "status": "needs_help",
+        "needs": [
+          "power_for_device"
+        ],
+        "supply_hours_left": null,
+        "needs_transport": false,
+        "distress_level": 1,
+        "band": "Watch"
+      },
+      "note": "Photo of a wheelchair battery display"
+    },
+    {
+      "reply_id": "tr-19",
+      "resident_id": "res-012",
+      "language": "vi",
+      "text": "Ai vậy?",
+      "image": null,
+      "expected": {
+        "status": "unclear",
+        "needs": [],
+        "supply_hours_left": null,
+        "needs_transport": false,
+        "distress_level": 0,
+        "band": "Watch"
+      },
+      "note": "Vietnamese ambiguous ('who is this?')"
+    },
+    {
+      "reply_id": "tr-20",
+      "resident_id": "res-032",
+      "language": "en",
+      "text": "power's out but my son is here with a generator, we're fine",
+      "image": null,
+      "expected": {
+        "status": "ok",
+        "needs": [],
+        "supply_hours_left": null,
+        "needs_transport": false,
+        "distress_level": 0,
+        "band": "OK"
+      },
+      "note": "OK with context"
     }
   ]
 }

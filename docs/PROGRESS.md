@@ -15,10 +15,12 @@
 
 ## Current status
 
-- **Current phase:** H0–H1 (walking skeleton)
-- **Last updated:** 2026-10-23 03:25 UTC · Claude session
-- **Overall health:** 🟡 code for H0–H1 is done and checked locally; waiting on AWS credentials, Bedrock model access and a deploy
-- **Next gate:** H0–H1, "Deployed URL returns a Bedrock reply; 3D path chosen (Amazon or fallback)" · ⬜ not met: nothing deployed yet (no AWS credentials). 3D path chosen provisionally (Amazon `Terrain3D`), visual check needs the map key
+- **Current phase:** H1–H4 (each part works alone), started while H0–H1 waits on AWS credentials
+- **Last updated:** 2026-10-23 03:50 UTC · Claude session
+- **Overall health:** 🟡 H1–H4 code is done and tested without AWS; nothing has run against real Bedrock or DynamoDB yet (no credentials)
+- **Gates:**
+  - H0–H1 "Deployed URL returns a Bedrock reply; 3D path chosen" · ⬜ not met (no AWS credentials). 3D path chosen provisionally (Amazon `Terrain3D`)
+  - H1–H4 "Each part works alone" · 🟡 met with stubs and mocks: P1 screens on mock JSON, P2 routes on a fake DynamoDB, P3 Jobs 1–2 on a stubbed Bedrock, P4 data validated. Real-AWS check pending
 
 ---
 
@@ -30,7 +32,7 @@ Phases and gates from [PLAN.md §13](PLAN.md#13-timeline-18-build-hours). H0 is 
 |---|---|---|---|
 | Pre-event setup | §18 checklist done (see Open questions) | ⚠️ superseded: hacking started with items still open | |
 | H0–H1 | Deployed URL returns a Bedrock reply; 3D path chosen (Amazon or fallback) | 🔄 in progress: code done, deploy blocked on credentials | |
-| H1–H4 | Each part works alone | ⬜ not started | |
+| H1–H4 | Each part works alone | 🔄 in progress: code done and tested offline; real-AWS check blocked on credentials | |
 | H4–H6 | Replies flow into the queue and onto the map | ⬜ not started | |
 | H6–H7 | Plan renders | ⬜ not started | |
 | H7–H8 | Golden path green, or cut (safety video recorded) | ⬜ not started | |
@@ -50,7 +52,7 @@ From [PLAN.md §11](PLAN.md#11-scope-tiers). Tick items as they are finished.
 
 ### MUST: the golden path, green by H8
 
-- [ ] Seed data, plus a Reset demo button
+- [ ] Seed data, plus a Reset demo button (data and `/demo/reset` done; button drives the mock until H4–H6)
 - [ ] Outage zone → affected residents on a **flat (2D) satellite map**, markers colored by status
 - [ ] Job 1: check-ins sent (shown in the phone simulator)
 - [ ] Job 2: text replies → assessment → Job 3: score and "why" in the queue
@@ -124,6 +126,27 @@ Newest entry on top. Template:
 **Next steps:** (who does what next)
 - ...
 ```
+
+### 2026-10-23 · H1–H4 · Each part works alone (offline)
+**By:** Claude session · **Branch/PR:** [`claude/focused-einstein-cqibah`](https://github.com/harbul/Spartan-hack/compare/main...neels22:Spartan-hack:claude/focused-einstein-cqibah)
+**Done:**
+- P4: [`residents.json`](../data/residents.json) 40 residents (15 EN, 13 ES, 12 VI; all device types; all inside the zone), [`resources.json`](../data/resources.json) 2 CRCs + pharmacy just outside the zone, [`volunteers.json`](../data/volunteers.json) 3 volunteers, [`test_replies.json`](../data/test_replies.json) 20 labeled replies with expected bands from §5. Checked by [`test_seed_data.py`](../backend/tests/test_seed_data.py).
+- P2: [`store.py`](../backend/app/store.py) for every §7 table (Decimal in/out, per-thread boto3), reseed from `data/`; [`geo.py`](../backend/app/geo.py) point-in-polygon + nearest resource; `POST /demo/reset`, `POST /outages` (affected residents, cases, `outage_started` event); shared 503/502 error handlers.
+- P3: trace row per Bedrock call (masked phones); Job 1 `write_checkin()` / `write_checkins()` (10 threads); Job 2 `assess_reply()` with photo and the forced `record_assessment` tool (built from `schemas.Assessment`); prompts in `checkin.md` and `assess.md`; EN/ES/VI privacy word check in `eval_replies.py`.
+- P1: four-area command center, timeline (play 1×/4×/16×, jumps, markers, Key events, counters), phone simulator (quick replies, photo resize under 1 MB), all on [`api/mock.ts`](../frontend/src/api/mock.ts) through `useDashboard()` in [`api/client.ts`](../frontend/src/api/client.ts).
+- Checks: `pytest` 31 passed (5 skipped stubs for later phases), `compileall` ok, `sam build` ok with `data/` and prompts in the package, `npm run build` ok, both pages exercised in Chromium.
+**Not done / cut:**
+- Nothing ran against real AWS (no credentials): reset/outages on DynamoDB, Jobs 1–2 on Bedrock.
+- The 2 photo files for tr-02 and tr-18 (`data/photos/`) don't exist yet.
+- Out of scope for H1–H4 and left as TODOs: `/checkins` and `/inbound` routes, triage, escalation, `/dashboard`, traces list, eval run.
+**Decisions made:**
+- See the Decisions log entries dated 2026-10-23 (H1–H4).
+**Blockers / risks:**
+- Same as H0–H1: credentials → model access → deploy. Then run the H1–H4 smoke test below.
+- Rosa's expected band (High) is exactly 60; it needs the model to rate her distress at 1 or more.
+**Next steps:**
+- When credentials arrive: deploy, `curl -X POST <ApiUrl>/demo/reset`, `POST /outages` with the zone (expect 40 affected), then run Jobs 1–2 once by hand (README) and look at the `traces` table.
+- H4–H6: P2 `/inbound`, `/clock/advance`, triage (with the supply fallback below), escalation, `/dashboard`; P3 Jobs 3–4 + eval run; P1 swap `useDashboard()` to the API; P4 the 2 photos, sources, script draft.
 
 ### 2026-10-23 · H0–H1 · Walking skeleton (code done, deploy blocked)
 **By:** Claude session · **Branch/PR:** [`claude/focused-einstein-cqibah`](https://github.com/harbul/Spartan-hack/compare/main...neels22:Spartan-hack:claude/focused-einstein-cqibah)
@@ -202,6 +225,17 @@ Decisions that change or clarify the plan. If one changes the plan, `PLAN.md` is
 | 2026-10-23 | `IncidentMap` uses the Hybrid style (satellite + street labels) | Plan allows satellite or hybrid; labels help the coordinator | Claude session |
 | 2026-10-23 | `components/map/maplibre.ts` sets the MapLibre worker URL; `amazonStyle.ts` builds the style URLs | MapLibre v6 finds its worker at runtime and Vite doesn't copy it (map failed with "Worker failed to load") | Claude session |
 | 2026-10-23 | `/hello-bedrock` and its response type stay out of the shared contracts | Debug route for the gate only; deleted when §8 routes land | Claude session |
+| 2026-10-23 | Seed data reaches the Lambda through a symlink `backend/data -> ../data` (closes the seed-data question) | `sam build` copies the files; no extra deploy step. Deploy from macOS/Linux/WSL (Windows git may check out the link as a text file); locally `store.py` also falls back to the repo-root `data/` | Claude session |
+| 2026-10-23 | DynamoDB tables are named `<stack>-<table>` (e.g. `stillhere-cases`) | Matches `.env.example`, so local runs hit the deployed tables with stack name `stillhere` | Claude session |
+| 2026-10-23 | All 40 demo residents are inside the zone; Harold lives alone | §3 says ~40 residents in the zone; living alone keeps Harold's reply in High with modest distress (§3 doesn't say) | Claude session |
+| 2026-10-23 | Test-reply bands assume **`time_pressure` uses `supply_hours_left`, else `baseline_backup_hours`** (PROPOSED for triage.py) | Without the fallback, Rosa and Harold score Watch (below the agent's 60 cut-off) and Lupe never reaches Critical, which breaks the §3 story | Claude session |
+| 2026-10-23 | Job 1 sends the model only first name, language, "medicine"/"equipment" and local times, never the devices | Privacy by construction (§4 Job 1 rule); a test checks every resident's request for device words | Claude session |
+| 2026-10-23 | Jobs return `JobResult(output, trace_id)` | Callers need the trace id for `Message.trace_id` / `Plan.trace_id` | Claude session |
+| 2026-10-23 | Trace masking covers phone numbers only until Guardrails (§4 Job 6, SHOULD tier) | Names and addresses need ApplyGuardrail; demo data is fictional meanwhile | Claude session |
+| 2026-10-23 | Frontend API client added: `api/client.ts` (fetch helpers, `useDashboard()`), `api/seed.ts`, `api/mock.ts` (closes the API-client question) | One hook to switch from mock to `/dashboard` in H4–H6 without touching the screens | Claude session |
+| 2026-10-23 | `BedrockBadge.tsx` and `status.ts` live in `components/`; top bar and action bar stay in `CommandCenter.tsx` (closes the shared-UI question) | The badge and colors are used by several panels; the bars by one page | Claude session |
+| 2026-10-23 | Vite may read `../data` (`server.fs.allow`) and the app imports the seed JSON | §9.2 says quick replies come from `data/test_replies.json`; one source of truth | Claude session |
+| 2026-10-23 | Display categories: ok/resolved = Safe; awaiting_reply/escalated/silent = No reply; needs_help/dispatched = Critical if band Critical, else Needs help | One rule (`categoryOf`) for markers, cards and counters; `/dashboard` counts should use the same rule | Claude session |
 
 ---
 
@@ -222,10 +256,7 @@ From [PLAN.md §18](PLAN.md#18-pre-event-checklist-and-open-questions):
 From the repo setup (2026-10-23):
 
 - [ ] **PROPOSED shapes** in `schemas.py` / `types.ts`: `ScoreBreakdown` field names, `Escalation`, `ToolCall`, `DashboardCase.resident`, `Outage.status`, `Stop.action` values, `Volunteer.capacity` meaning, `Resource.offers`. P1, P2, P3 confirm at H0.
-- [ ] **Seed data in Lambda:** `/demo/reset` reseeds from `data/`, but the Lambda package is `backend/` only. Copy `data/` into the build, upload it to S3, or move `CodeUri` to the repo root? (P2)
-- [ ] **Test reply photos:** where do the 2 eval photos live (suggest `data/photos/`) and are binary files OK in the repo? (P4, P3)
-- [ ] **Frontend API client:** add `frontend/src/api/client.ts` (fetch wrapper + TanStack Query hooks) next to `types.ts`? Not added because it wasn't in the agreed additions. (P1)
-- [ ] **Small shared UI pieces** from §9 with no file in §10: top bar, action bar, About panel, "Amazon Bedrock" badge. They start inside `CommandCenter.tsx`; split into `components/` when needed? (P1)
+- [ ] **Test reply photos:** `test_replies.json` points tr-02 to `data/photos/minh_gauge.jpg` and tr-18 to `data/photos/wheelchair_battery.jpg`. Someone takes or makes the 2 photos (under 1 MB each); OK to commit them as binaries? (P4, P3)
 - [ ] **Lockfile:** `frontend/package-lock.json` is committed so all four laptops and Amplify install the same versions. Keep it? (P1, P2)
 
 From H0–H1 (2026-10-23):
@@ -233,4 +264,7 @@ From H0–H1 (2026-10-23):
 - [ ] **Amplify branch for the gate:** Amplify deploys `main` (§6). Connect this branch too for the gate check, or merge first? (P2)
 - [ ] **Lock down public surfaces:** CORS (`*` in FastAPI and the HTTP API) and the map key's allowed referers should name the Amplify URL and localhost once the Amplify URL exists. (P2)
 - [ ] **3D buildings height:** the extrusion reads the `height` property of the `buildings` tile layer, with 6 m if it's missing. Check on `/3d-test` with the key. If all buildings look the same height, drop buildings and keep terrain. (P1)
+- [ ] **Triage supply fallback:** confirm `time_pressure` uses `supply_hours_left`, else `baseline_backup_hours` (see Decisions). If not, relabel the test-reply bands. (P2, P3, P4)
+- [ ] **Rosa on the line:** her expected band (High, score 60) needs distress ≥ 1 from Job 2. Accept, or give her `baseline_backup_hours` lower / a reply with more urgency? (P4, P3)
+- [ ] **`/demo/reset` response:** returns `null` (§8 says n/a). Fine for the Reset button? (P1, P2)
 - [ ] **Worker file type on Amplify:** the MapLibre worker ships as `assets/maplibre-gl-worker-*.mjs`. If the deployed map is blank with a MIME-type error, add a `Content-Type: text/javascript` custom header for `*.mjs`. (P1, P2)
