@@ -16,7 +16,7 @@
 ## Current status
 
 - **Current phase:** H4–H6 (replies flow into the queue and onto the map), built offline while H0–H1 waits on AWS credentials
-- **Last updated:** 2026-10-23 04:10 UTC · Claude session
+- **Last updated:** 2026-10-23 04:30 UTC · Claude session
 - **Overall health:** 🟡 code through H4–H6 is done and tested without AWS (80 tests, plus the live UI against the real API with in-memory tables and stand-in Bedrock jobs). Nothing has run on real Bedrock or DynamoDB yet (no credentials)
 - **Gates:**
   - H0–H1 "Deployed URL returns a Bedrock reply; 3D path chosen" · ⬜ not met (no AWS credentials). 3D path chosen provisionally (Amazon `Terrain3D`)
@@ -137,6 +137,36 @@ Newest entry on top. Template:
 **Next steps:** (who does what next)
 - ...
 ```
+
+### 2026-10-23 · H4–H6 · Real zone, stable bands, crowd replies
+**By:** Claude session · **Branch/PR:** `data/demo-seed`
+**Done:**
+- [`outage_zone.geojson`](../data/outage_zone.geojson): real hand-drawn polygon (was the placeholder), from the valley edge east into the foothills. All 40 residents are ≥ 238 m inside; resources and volunteer starts ≥ 303 m outside.
+- Band stability: the 6 test replies whose score sat exactly on a cut-off (tr-01, 05, 11, 16, 17 at 30/60/80; tr-18 at 30) now keep their band when Job 2 rates distress one notch higher or lower. Done through resident profiles only (5 now live alone; Patricia Johnson backup 12 h and not alone); reply texts and labels unchanged.
+- [`crowd_replies.json`](../data/crowd_replies.json): 16 simple OK replies (EN/ES/VI) for the background residents with no test reply. Silent residents are now exactly res-005 (Lupe), res-025, res-036, res-039, matching the mock.
+- `api/seed.ts` exports `crowdReplies`; `api/mock.ts` derives its silent set and crowd texts from the data instead of hard-coding them.
+- `test_seed_data.py`: volunteer starts are outside the zone; crowd replies are valid and leave only the 4 silent residents; the golden-path stops (10 High/Critical replies + 4 door-knocks = 14) fit 3 volunteers × 6.
+- PLAN.md §3, §10, §17 and the README folder map mention the crowd step.
+**Not done / cut:**
+- No "Others reply" button yet. `/inbound` now exists on main, so the button (phone simulator) can post tr-05 to tr-20 and every crowd reply through it before the clock moves. That brings the golden path from 36 silent residents to 4.
+- The 2 photos and `docs/sources.md` are still open.
+**Decisions made:**
+- See the Decisions log entries for crowd replies and band stability.
+**Next steps:**
+- P1: the "Others reply" button. P2: extend `test_flow.py` to send the crowd and expect 4 silent. P4: photos, sources.
+
+### 2026-10-23 · H1–H4 · Parallel data set dropped; silence-load check
+**By:** Claude session · **Branch/PR:** `data/demo-seed`
+**Done:**
+- A second, parallel fill of `data/` (44 residents, a new zone polygon) was merged with main and dropped in favour of main's data, which `test_seed_data.py` and `api/mock.ts` already depend on. The new zone polygon was dropped too: it left res-014 outside the zone and put crc-1, crc-2, vol-2 and vol-3 inside it.
+- Ticked the §18 rules question in PLAN.md (matches the Decisions log).
+- Checked the escalation load on main's data: see the Silence flood open question.
+**Not done / cut:**
+- No data changes.
+**Blockers / risks:**
+- Silence flood (Open questions). Insulin "hours left" is medically soft (unopened insulin keeps at room temperature for weeks; heat is the real risk); P4 to check against the FDA source when filling `docs/sources.md`.
+**Next steps:**
+- All: pick a silence-flood option before P2 builds escalation and P3 tunes the planner.
 
 ### 2026-10-23 · H4–H6 · Replies flow into the queue and onto the map (offline)
 **By:** Claude session · **Branch/PR:** [`claude/focused-einstein-cqibah`](https://github.com/harbul/Spartan-hack/compare/main...neels22:Spartan-hack:claude/focused-einstein-cqibah) · Plan: supply-hours fallback and Rosa's margin decided by the team before starting
@@ -279,6 +309,8 @@ Decisions that change or clarify the plan. If one changes the plan, `PLAN.md` is
 | 2026-10-23 | The 1-minute schedule sends `{"stillhere": "escalation_check"}`; `main.handler` routes it | Simple, explicit routing; the schedule is back on | Claude session |
 | 2026-10-23 | `VITE_USE_MOCK=true` keeps the screens on the mock until the AWS gate; delete the mock in H7–H8 | The team can keep building screens offline | Claude session |
 | 2026-10-23 | Display categories: ok/resolved = Safe; awaiting_reply/escalated/silent = No reply; needs_help/dispatched = Critical if band Critical, else Needs help | One rule (`categoryOf`) for markers, cards and counters; `/dashboard` counts should use the same rule | Claude session |
+| 2026-10-23 | **Silence flood fixed with crowd replies** (option a): after the 4 hero replies, the other 16 test replies and 16 simple OK replies (`data/crowd_replies.json`) arrive; only 4 residents stay silent | Without it, 36 residents go silent at +3 h, swamping the plan (18 stops) and hiding Lupe. Keeps 40 households on the map. Closes the Silence flood question | Team (chosen), Claude session |
+| 2026-10-23 | Test-reply bands must hold with distress ±1 (no score on a 30/60/80 cut-off) | Job 2 distress is a judgment call; a one-notch miss shouldn't flip a band in the eval or on camera. Rosa now lives alone (70, was 60). Closes the Rosa question | Claude session |
 
 ---
 
@@ -307,7 +339,7 @@ From H0–H1 (2026-10-23):
 - [ ] **Amplify branch for the gate:** Amplify deploys `main` (§6). Connect this branch too for the gate check, or merge first? (P2)
 - [ ] **Lock down public surfaces:** CORS (`*` in FastAPI and the HTTP API) and the map key's allowed referers should name the Amplify URL and localhost once the Amplify URL exists. (P2)
 - [ ] **3D buildings height:** the extrusion reads the `height` property of the `buildings` tile layer, with 6 m if it's missing. Check on `/3d-test` with the key. If all buildings look the same height, drop buildings and keep terrain. (P1)
-- [ ] **36 silent residents in the golden path:** only the 4 heroes reply, so the other 36 also escalate to L3 (about 150 Bedrock calls on the first +3 h, 36 door-knocks on the map, and a +3 h jump may near the 30 s API limit). Proposal: a phone-simulator button "Others reply" that sends the remaining test replies and "1"s through the real `/inbound` before the clock moves (real pipeline, simulated residents), leaving only Lupe and 2–3 others silent. (P1, P4, P3)
+- [ ] **"Others reply" button:** the data side of the 36-silent fix is in (`data/crowd_replies.json`; see Decisions). Still needed: a phone-simulator button that posts tr-05 to tr-20 plus every crowd reply through `/inbound` before the clock moves, so only Lupe, res-025, res-036 and res-039 stay silent (14 plan stops, ~12 Job 4 calls on +3 h). (P1, P2)
 - [ ] **Sources to verify:** open every link in `docs/sources.md`, read the Santa Clara County emPOWER number off the live map, and find a confirmed outage-related harm (the 2019 El Dorado County case was ruled not outage-caused). (P4)
 - [ ] **`/demo/reset` response:** returns `null` (§8 says n/a). Fine for the Reset button? (P1, P2)
 - [ ] **Worker file type on Amplify:** the MapLibre worker ships as `assets/maplibre-gl-worker-*.mjs`. If the deployed map is blank with a MIME-type error, add a `Content-Type: text/javascript` custom header for `*.mjs`. (P1, P2)

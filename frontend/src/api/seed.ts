@@ -4,6 +4,7 @@
  *
  * Implements: PLAN.md §9.2 (quick replies from data/test_replies.json). Owner: P1 (Frontend and UX).
  */
+import crowdRepliesJson from '../../../data/crowd_replies.json';
 import residentsJson from '../../../data/residents.json';
 import resourcesJson from '../../../data/resources.json';
 import testRepliesJson from '../../../data/test_replies.json';
@@ -29,8 +30,17 @@ export interface TestReply {
   note: string;
 }
 
+/** One simple OK reply from data/crowd_replies.json (background residents with no test reply). */
+export interface CrowdReply {
+  resident_id: string;
+  language: Language;
+  text: string;
+  expected: { status: AssessmentStatus; band: Band };
+}
+
 export const residents = residentsJson.residents as Resident[];
 export const resources = resourcesJson.resources as Resource[];
 export const volunteers = volunteersJson.volunteers as Volunteer[];
 export const testReplies = testRepliesJson.replies as TestReply[];
+export const crowdReplies = crowdRepliesJson.crowd_replies as CrowdReply[];
 export const zonePolygon = JSON.parse(zoneJson).features[0].geometry as GeoJSONGeometry;
