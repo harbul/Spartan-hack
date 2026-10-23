@@ -2,6 +2,7 @@
 
 **StillHere** is a 3D emergency response command center that keeps electricity-dependent residents safe during a California power shutoff (PG&E PSPS). Amazon Bedrock writes check-in texts, reads replies, explains priorities, escalates residents who go silent and plans volunteer routes; a county coordinator approves every dispatch. Built on AWS for SpartHill Hacks 2026 (AWS Track).
 
+- **New to the project? Start at [docs/HANDOFF.md](docs/HANDOFF.md)**: status, the AWS critical path, and remaining work by role.
 - **Build plan (source of truth):** [docs/PLAN.md](docs/PLAN.md)
 - **Progress log (where we are now):** [docs/PROGRESS.md](docs/PROGRESS.md). Read both before starting work; update PROGRESS.md in the same commit as your work.
 
@@ -14,6 +15,7 @@ Spartan-hack/
 ├── docs/
 │   ├── PLAN.md               the build plan
 │   ├── PROGRESS.md           phase status, scope tracker, decisions, open questions
+│   ├── HANDOFF.md            start here: status, critical path, remaining work by role
 │   ├── architecture.svg      architecture diagram for the video (§6)
 │   ├── video_script.md       5-minute video script (§14)
 │   ├── sources.md            cited stats for the persona (§18)

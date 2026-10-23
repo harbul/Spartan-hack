@@ -15,9 +15,10 @@
 
 ## Current status
 
-- **Current phase:** H6–H7 (plan renders), built offline while H0–H1 waits on AWS credentials. Next: H7–H8, the golden path on the deployed URL (needs AWS)
-- **Last updated:** 2026-10-23 19:30 UTC · Claude session
-- **Overall health:** 🟡 the whole MUST golden path is code-complete and tested without AWS (103 tests, plus the live UI against the real API with in-memory tables and stand-in Bedrock and Location). Nothing has run on real AWS yet (no credentials); that is now the only thing between us and the H7–H8 gate
+- **Current phase:** H8–H12 (SHOULD tier) in progress, built offline. The H7–H8 gate (golden path on the deployed URL + safety video) waits on AWS credentials
+- **Handoff:** new to the project or picking up a role? Start at **[HANDOFF.md](HANDOFF.md)**: status, the AWS critical path, and remaining work by role
+- **Last updated:** 2026-10-23 19:35 UTC · Claude session
+- **Overall health:** 🟡 MUST golden path and most of SHOULD are code-complete and tested without AWS (117 tests, `npm run build`, live UI against the real API with in-memory tables and stand-in Bedrock and Location). Nothing has run on real AWS yet (no credentials); that is the only blocker for H7–H8
 - **Gates:**
   - H0–H1 "Deployed URL returns a Bedrock reply; 3D path chosen" · ⬜ not met (no AWS credentials). 3D path chosen provisionally (Amazon `Terrain3D`)
   - H1–H4 "Each part works alone" · 🟡 met with stubs and mocks; real-AWS check pending
@@ -28,11 +29,11 @@
 
 | Area | Done (merged to `main`) | Remaining |
 |---|---|---|
-| **AWS** | SAM template (Lambda, HTTP API, 8 tables, bucket, map key, scoped Bedrock + Location IAM, 1-minute schedule), `amplify.yml`, deploy + smoke-test steps in README | Credentials, Bedrock model access, first `sam deploy`, Amplify app, then the README smoke test (incl. `/plans`) and `eval_replies.py` |
-| **P2 Backend** | Every §8 route: reset, outages, check-ins, inbound (+ photo to S3), clock, dashboard (with plan), messages, traces, plans, approve, stop done, runs; `store`, `geo`, `triage`, `escalation`, `location` (+ straight-line fallback), scheduled check | Real-AWS check; CORS and map-key referer lock-down |
-| **P3 AI** | `converse()` + trace rows, Jobs 1–5 with prompts (Job 5: tool-use agent, rules checked in code, greedy fallback), privacy by construction for every SMS, eval script | Run the eval on real Bedrock (18/20) and time the agent (< ~20 s); Guardrails + name/address masking; fallback model |
-| **P1 Frontend** | Command center on the live API (action bar 1–4, Plan tab, routes on the map), timeline, phone simulator (+ Others reply), volunteer route sheet, AI Trace list, flat map; mock behind `VITE_USE_MOCK`; `/3d-test` | Delete the mock (H7–H8); 3D, fly-to, pulsing markers, trace step detail, About panel (H8–H12) |
-| **P4 Story/data** | 40 residents, zone, resources, volunteers, 20 labeled replies; drafts of `sources.md` and `video_script.md`; `architecture.svg` | Verify every source and fill the emPOWER number + a confirmed harm case; 2 reply photos; record the safety video (H7–H8) |
+| **AWS** | SAM template (Lambda, HTTP API, 8 tables, bucket, map key, 2 guardrails, scoped Bedrock + Location + Guardrail IAM, 1-minute schedule), `amplify.yml`, deploy + smoke-test steps in README | Credentials, model access, first `sam deploy`, Amplify app, README smoke test (incl. `/plans`), `eval_replies.py`, 3 clean runs (HANDOFF.md §4) |
+| **P2 Backend** | Every §8 route; `store`, `geo`, `triage`, `escalation`, `location` (+ straight-line fallback), scheduled check; reply screening never blocks a reply | Real-AWS check; lock CORS and map-key referers; `/demo/reset` response; confirm PROPOSED shapes; 2 stale TODO comments |
+| **P3 AI** | `converse()` + traces, Jobs 1–5 with prompts (Job 5 agent with rules in code + greedy fallback), privacy by construction, Guardrails (advice on SMS + reply screening, PII masking in traces), eval script | Eval on real Bedrock (18/20); time the agent (< ~20 s; PII masking latency); fallback model retry; ES/VI end to end; photo replies once photos exist; Guardrail shot |
+| **P1 Frontend** | Command center on the live API (action bar 1–4, Plan tab, routes), 3D map (terrain, toggles, fly-to), pulsing no-reply markers, About panel, timeline, phone simulator (+ Others reply), route sheet, AI Trace list (+ guardrail result); mock behind `VITE_USE_MOCK` | Polish + loading/empty/error states; backup-hours countdown in queue cards; agent step detail in AI Trace; check satellite/buildings/pulse with the key; delete mock and `/3d-test` after the gate |
+| **P4 Story/data** | 40 residents, real zone, resources, volunteers, 20 labeled + 16 crowd replies; `architecture.svg`; drafts of `sources.md` and `video_script.md` | Verify sources (emPOWER number, a confirmed harm case) then flip `verified` in the About panel; 2 reply photos; recorder + 3D check on the recording machine; safety video (H7–H8); final script; `submission.md` |
 
 ---
 
@@ -138,6 +139,14 @@ Newest entry on top. Template:
 **Next steps:** (who does what next)
 - ...
 ```
+
+### 2026-10-23 · Handoff · Project handed to the team
+**By:** Claude session · **Branch/PR:** [`claude/focused-einstein-cqibah`](https://github.com/harbul/Spartan-hack/compare/main...neels22:Spartan-hack:claude/focused-einstein-cqibah)
+**Done:**
+- [HANDOFF.md](HANDOFF.md): where we are, a 15-minute start, team rules (run `pytest` **and** `npm run build` before every merge), the AWS critical path in order, remaining work by role P1–P4 with first steps and files, the timeline to submission, open decisions and a file map.
+- Refreshed this file's Current status, Done vs remaining and Open questions (closed "Assets", merged "Persona sources" into "Sources to verify").
+**Next steps:**
+- P2 (+P3, P4): the AWS gate, HANDOFF.md §4. Everyone else: their role's list in HANDOFF.md §5; all of it can start offline.
 
 ### 2026-10-23 · H8–H12 · Review of PR #12 and two fixes
 **By:** Claude session · **Branch/PR:** [`claude/focused-einstein-cqibah`](https://github.com/harbul/Spartan-hack/compare/main...neels22:Spartan-hack:claude/focused-einstein-cqibah)
@@ -375,6 +384,8 @@ Decisions that change or clarify the plan. If one changes the plan, `PLAN.md` is
 | 2026-10-23 | Frontend API client added: `api/client.ts` (fetch helpers, `useDashboard()`), `api/seed.ts`, `api/mock.ts` (closes the API-client question) | One hook to switch from mock to `/dashboard` in H4–H6 without touching the screens | Claude session |
 | 2026-10-23 | `BedrockBadge.tsx` and `status.ts` live in `components/`; top bar and action bar stay in `CommandCenter.tsx` (closes the shared-UI question) | The badge and colors are used by several panels; the bars by one page | Claude session |
 | 2026-10-23 | Vite may read `../data` (`server.fs.allow`) and the app imports the seed JSON | §9.2 says quick replies come from `data/test_replies.json`; one source of truth | Claude session |
+| 2026-10-23 | Closed "Assets" (the UI is built and `architecture.svg` exists, so wireframes are no longer needed) and merged "Persona sources" into "Sources to verify" | Keep Open questions to what still blocks work | Claude session |
+| 2026-10-23 | Handoff to the team: [HANDOFF.md](HANDOFF.md) holds status, the AWS critical path and remaining work by role; PROGRESS.md stays the detailed tracker | One place for a teammate to start | Team |
 | 2026-10-23 | **Capacity (closes "36 silent residents"):** "Others reply" on the phone simulator (#9's data-driven version) sends the other test replies and the crowd replies through the real `/inbound` (Lupe, res-025, res-036, res-039 stay silent); plans list what can't fit as `Plan.uncovered` ("next wave") | 3 volunteers × 6 stops = 18; without it ~40 cases were ≥ 60. Simulated residents, real processing | Team |
 | 2026-10-23 | A plan must cover every case with priority ≥ 60 **and every silent (L3) case**, whatever its priority | §5: L3 is "automatically added as a door-knock stop in the next plan"; res-039 scores Watch while silent | Claude session |
 | 2026-10-23 | `submit_plan` enforces the §4 rules in code (6 stops, Critical first, seats for rides, real open cases, no uncovered case while room is left) and returns problems to the agent | The agent decides who and why; the code guarantees the rules | Claude session |
@@ -411,9 +422,7 @@ From [PLAN.md §18](PLAN.md#18-pre-event-checklist-and-open-questions):
 
 - [ ] **Event schedule:** hacking has started; record the exact H0 clock time so H0 to H18 maps to the clock.
 - [ ] **AWS account:** credentials not here yet. Region assumed `us-west-2` (in `.env.example` and the README); confirm. Bedrock model access for one fast and one strong Claude model, and their inference profile IDs.
-- [ ] **Amazon Location:** style and 3D terrain are confirmed at the style level in us-west-2 (see Decisions). Still open: a visual check on `/3d-test` with the key, and `OptimizeWaypoints` (H6–H7). Mapbox token only if both Amazon options fail.
-- [ ] **Persona sources** for `docs/sources.md`: HHS emPOWER (Santa Clara County), PG&E PSPS history, FDA insulin storage guidance, one documented outage-related harm.
-- [ ] **Assets:** wireframes of the four-area command center, the phone simulator and the volunteer view; a draft of the architecture diagram.
+- [ ] **Amazon Location:** style and 3D terrain are confirmed at the style level in us-west-2, and `OptimizeWaypoints`/`CalculateRoutes` are built with a straight-line fallback. Still open: a visual check with the key, and real routes on the deploy. Mapbox token only if both Amazon options fail.
 - [ ] **Accounts:** an Amplify app connected to this repo; a screen recorder ready (for example OBS).
 - [ ] **Submission:** where the video is uploaded, the accepted format, and the event channel for judge questions. Record answers in `docs/submission.md`.
 
