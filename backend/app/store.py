@@ -14,6 +14,7 @@ Owner: P2 (Backend and infra).
 import json
 import os
 import threading
+import uuid
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -209,7 +210,9 @@ def list_traces(limit: int = 50) -> list[Trace]:
 
 
 def add_event(event: Event) -> None:
-    _table("EVENTS_TABLE").put_item(Item=_to_item(event))
+    # Sort key "<ts>#<random>" keeps time order and lets events share a timestamp.
+    item = _to_item(event) | {"sk": f"{event.ts}#{uuid.uuid4().hex[:8]}"}
+    _table("EVENTS_TABLE").put_item(Item=item)
 
 
 def list_events(outage_id: str) -> list[Event]:

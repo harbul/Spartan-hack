@@ -205,12 +205,13 @@ Resources:
     Properties:
       TableName: !Sub ${AWS::StackName}-events
       BillingMode: PAY_PER_REQUEST
+      # Sort key "<ts>#<random>": many events can share a virtual timestamp.
       AttributeDefinitions:
         - { AttributeName: outage_id, AttributeType: S }
-        - { AttributeName: ts, AttributeType: S }
+        - { AttributeName: sk, AttributeType: S }
       KeySchema:
         - { AttributeName: outage_id, KeyType: HASH }
-        - { AttributeName: ts, KeyType: RANGE }
+        - { AttributeName: sk, KeyType: RANGE }
 
   ConfigTable:
     Type: AWS::DynamoDB::Table

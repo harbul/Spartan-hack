@@ -18,8 +18,9 @@ Owner: P2 (Backend and infra).
 """
 
 import math
+from datetime import datetime
 
-from app.schemas import Assessment, Band, Resident, ScoreBreakdown
+from app.schemas import Assessment, Band, Case, Outage, Resident, ScoreBreakdown
 
 REVIEW_CONFIDENCE = 0.6  # below this, the case is flagged "Needs human review" (§4 Job 2)
 OK_CONFIDENCE = 0.8  # an "ok" reply only de-prioritizes at this confidence or higher
@@ -78,3 +79,26 @@ def band(total: float) -> Band:
     if total >= 30:
         return "Watch"
     return "OK"
+
+
+def parse_ts(ts: str) -> datetime:
+    return datetime.fromisoformat(ts.replace("Z", "+00:00"))
+
+
+def score_case(resident: Resident, case: Case, outage: Outage, at: datetime) -> tuple[ScoreBreakdown, float]:
+    """Score a case at virtual time `at`: the breakdown and the backup hours left.
+
+    Silence counts from the check-in (last_outbound_at) until the first reply;
+    escalation messages don't reset it.
+    """
+    hours = lambda since: max(0.0, (at - parse_ts(since)).total_seconds() / 3600)  # noqa: E731
+    replied = case.last_inbound_at is not None
+    minutes_silent = hours(case.last_outbound_at) * 60 if case.last_outbound_at and not replied else 0
+    backup = backup_hours_left(
+        resident,
+        case.assessment,
+        hours(outage.starts_at),
+        hours(case.last_inbound_at) if replied else 0,
+    )
+    remaining = max(0.0, (parse_ts(outage.est_restore_at) - at).total_seconds() / 3600)
+    return score(resident, case.assessment, remaining, minutes_silent, backup), round(backup, 1)

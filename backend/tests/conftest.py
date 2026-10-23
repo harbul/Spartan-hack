@@ -16,7 +16,7 @@ KEYS = {
     "MESSAGES_TABLE": ["resident_id", "ts"],
     "PLANS_TABLE": ["plan_id"],
     "TRACES_TABLE": ["trace_id"],
-    "EVENTS_TABLE": ["outage_id", "ts"],
+    "EVENTS_TABLE": ["outage_id", "sk"],
     "CONFIG_TABLE": ["key"],
 }
 
