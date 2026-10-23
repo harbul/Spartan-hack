@@ -156,7 +156,8 @@ def test_scheduled_event_runs_the_check(api, monkeypatch):
     assert calls == ["out-x"]
 
 
-KEEP_SILENT = {"res-005", "res-025", "res-036"}  # same list as the phone simulator's "Others reply"
+# Everyone with a labeled or crowd reply answers (as "Others reply" does); the rest stay silent.
+KEEP_SILENT = set(PHONES) - set(REPLIES)
 
 
 class NoLocation:
@@ -181,9 +182,9 @@ def test_plan_approve_and_mark_done(api, monkeypatch):
     assert client.post("/plans", json={"outage_id": outage["outage_id"]}).status_code == 409  # nothing open yet
     client.post(f"/outages/{outage['outage_id']}/checkins")
     client.post("/clock/advance", json={"minutes": 10})
-    for rid in PHONES:  # heroes and everyone else reply, except the ones kept silent
-        if rid not in KEEP_SILENT:
-            client.post("/inbound", json={"phone": PHONES[rid], "text": REPLIES.get(rid, {"text": "1"})["text"]})
+    assert KEEP_SILENT == {"res-005", "res-025", "res-036", "res-039"}
+    for rid in REPLIES:  # heroes, the other test replies and the crowd replies
+        client.post("/inbound", json={"phone": PHONES[rid], "text": REPLIES[rid]["text"]})
     client.post("/clock/advance", json={"minutes": 180})
 
     plan = client.post("/plans", json={"outage_id": outage["outage_id"]}).json()["plan"]

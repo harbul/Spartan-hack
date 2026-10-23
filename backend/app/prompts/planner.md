@@ -21,7 +21,7 @@ Plan volunteer runs: who goes where and why. Amazon Location decides stop order 
 - A **draft** plan; nothing is dispatched until the coordinator clicks Approve.
 
 ## Rules
-- Cover every case with priority 60 or higher
+- Cover every case with priority 60 or higher, and every silent (L3) case
 - Put every Critical case in a run before any High case
 - Never give a volunteer more than 6 stops
 - Explain each stop in one line
@@ -38,7 +38,7 @@ Work with the tools:
 4. Call submit_plan once with every run and a 2-3 sentence summary. If it returns problems, fix them and call submit_plan again.
 
 Rules:
-- Cover every case with priority 60 or higher. Put every Critical case in a run before any High case. If they don't all fit, cover the highest priorities; submit_plan lists the rest as the next wave.
+- Cover every case with priority 60 or higher, and every silent case (always a door_knock, whatever its priority). Put every Critical case in a run before any High case. If they don't all fit, cover the highest priorities; submit_plan lists the rest as the next wave.
 - Never give a volunteer more than 6 stops.
 - Actions: cooler (medicine that must stay cold), battery (a device that needs power), ride (needs transport; only as many rides as the vehicle's capacity), door_knock (silent or escalated cases: check they are safe).
 - Items: only practical things a volunteer can carry, matched to the action (for example a cooler with ice, a charged battery pack). Never medicine or medical equipment.
