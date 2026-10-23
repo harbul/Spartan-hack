@@ -55,6 +55,7 @@ EventType = Literal[
     "stop_done",
 ]
 ResourceType = Literal["resource_center", "pharmacy"]
+StopAction = Literal["cooler", "battery", "door_knock", "ride"]
 BedrockJob = Literal["checkin", "assess", "explain", "escalate", "planner"]
 
 # Timestamps are ISO 8601 strings in UTC (virtual time where noted).
@@ -168,7 +169,7 @@ class Message(BaseModel):
 
 class Stop(BaseModel):
     resident_id: str
-    action: str  # PROPOSED values: "cooler" | "battery" | "door_knock" | "ride"
+    action: StopAction
     items: list[str]
     reason: str  # agent's one-line reason
     eta: Timestamp | None = None
@@ -192,6 +193,7 @@ class Plan(BaseModel):
     runs: list[Run]
     summary: str
     trace_id: str | None = None
+    uncovered: list[str] = []  # open cases with priority >= 60 that didn't fit: "next wave"
 
 
 class ToolCall(BaseModel):
