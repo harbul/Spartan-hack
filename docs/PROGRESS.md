@@ -15,10 +15,10 @@
 
 ## Current status
 
-- **Current phase:** Pre-event setup
-- **Last updated:** 2026-10-23 01:46 UTC · Claude session
-- **Overall health:** 🟢 on track: repo structure, contracts and stubs are in; §18 pre-event items are still open
-- **Next gate:** H0–H1, "Deployed URL returns a Bedrock reply; 3D path chosen (Amazon or fallback)" · ⬜ not met
+- **Current phase:** H0–H1 (walking skeleton)
+- **Last updated:** 2026-10-23 03:25 UTC · Claude session
+- **Overall health:** 🟡 code for H0–H1 is done and checked locally; waiting on AWS credentials, Bedrock model access and a deploy
+- **Next gate:** H0–H1, "Deployed URL returns a Bedrock reply; 3D path chosen (Amazon or fallback)" · ⬜ not met: nothing deployed yet (no AWS credentials). 3D path chosen provisionally (Amazon `Terrain3D`), visual check needs the map key
 
 ---
 
@@ -28,8 +28,8 @@ Phases and gates from [PLAN.md §13](PLAN.md#13-timeline-18-build-hours). H0 is 
 
 | Phase | Gate | Status | Finished |
 |---|---|---|---|
-| Pre-event setup | §18 checklist done (see Open questions) | 🔄 in progress | |
-| H0–H1 | Deployed URL returns a Bedrock reply; 3D path chosen (Amazon or fallback) | ⬜ not started | |
+| Pre-event setup | §18 checklist done (see Open questions) | ⚠️ superseded: hacking started with items still open | |
+| H0–H1 | Deployed URL returns a Bedrock reply; 3D path chosen (Amazon or fallback) | 🔄 in progress: code done, deploy blocked on credentials | |
 | H1–H4 | Each part works alone | ⬜ not started | |
 | H4–H6 | Replies flow into the queue and onto the map | ⬜ not started | |
 | H6–H7 | Plan renders | ⬜ not started | |
@@ -125,6 +125,28 @@ Newest entry on top. Template:
 - ...
 ```
 
+### 2026-10-23 · H0–H1 · Walking skeleton (code done, deploy blocked)
+**By:** Claude session · **Branch/PR:** [`claude/focused-einstein-cqibah`](https://github.com/harbul/Spartan-hack/compare/main...neels22:Spartan-hack:claude/focused-einstein-cqibah)
+**Done:**
+- P3: `converse()` in [`bedrock.py`](../backend/app/bedrock.py): Converse API, model IDs from env at call time, returns text, `model_id`, `latency_ms`, tokens, `stop_reason` and the raw response. TODOs where tracing (§4), Guardrails (§4 Job 6) and the fallback model (§16) plug in.
+- P2: `GET /health` and skeleton `GET /hello-bedrock` in [`main.py`](../backend/app/main.py); clear 503 when model IDs are unset, 502 with the AWS error code otherwise. CORS for local runs.
+- P2: [`template.yaml`](../infra/template.yaml): Bedrock `InvokeModel` scoped to the configured IDs, browser map API key (`AWS::Location::APIKey`, Maps only), 1-minute schedule commented out. [`amplify.yml`](../amplify.yml) for the monorepo build.
+- P1: [`IncidentMap`](../frontend/src/components/map/IncidentMap.tsx) shows the Amazon Location Hybrid style over East San Jose; [`CommandCenter`](../frontend/src/pages/CommandCenter.tsx) shows the `/hello-bedrock` reply with an "Amazon Bedrock" badge. Throwaway 3D test at `/3d-test` ([`Map3DTest.tsx`](../frontend/src/pages/Map3DTest.tsx)).
+- P4: the 5 hero residents in [`residents.json`](../data/residents.json), all inside the zone polygon and valid against `schemas.Resident`. README "Run it locally" and "Deploy" have the real commands.
+- Checks: `pytest` 4 passed (8 skipped stubs), `compileall` ok, `cfn-lint` ok, `sam build` ok (43 MB, no dev deps), Mangum handler answers HTTP API v2 events, `npm run build` ok. Locally `/health` works and `/hello-bedrock` reaches Bedrock and fails only on credentials (`UnrecognizedClientException`).
+**Not done / cut:**
+- Not deployed and no real Bedrock reply yet: no AWS credentials, no model access.
+- Map with satellite imagery not seen yet: no Location API key (the SAM stack creates one).
+- Mapbox fallback not built (needs a new dependency); only needed if both Amazon options fail.
+**Decisions made:**
+- See the Decisions log entries dated 2026-10-23 (H0–H1).
+**Blockers / risks:**
+- Gate needs: AWS credentials → Bedrock model access → `sam deploy` → map key into `.env`/Amplify. Commands in [README.md](../README.md#deploy).
+- Building heights: the extrusion uses the `height` tile property with a 6 m default; check on `/3d-test` once the key exists.
+**Next steps:**
+- Team: run the README Deploy steps, then curl `<ApiUrl>/hello-bedrock` and open `/` and `/3d-test` locally; mark this phase ✅ here.
+- H1–H4 (after the gate): P2 tables + `/demo/reset` (decide how `data/` reaches the Lambda), `/outages`; P3 Jobs 1–2 + trace rows in `converse()`; P1 four-area layout on mock JSON; P4 the other ~35 residents, resources, volunteers, 20 test replies.
+
 ### 2026-10-23 · Pre-event setup · Repo folder structure
 **By:** Claude session · **Branch/PR:** [`claude/peaceful-carson-mu16gc`](https://github.com/harbul/Spartan-hack/compare/main...neels22:Spartan-hack:claude/peaceful-carson-mu16gc)
 **Done:**
@@ -168,6 +190,18 @@ Decisions that change or clarify the plan. If one changes the plan, `PLAN.md` is
 | 2026-10-23 | `samconfig.toml` is gitignored | `sam deploy --guided` saves parameter values there, incl. the optional Location key | Claude session |
 | 2026-10-23 | Vite reads env from the repo-root `.env` (`envDir: '..'`) | One `.env.example` for the whole team | Claude session |
 | 2026-10-23 | `/dashboard` cases embed the resident (`DashboardCase.resident`) | §8 has no residents list, but the map needs names and locations. PROPOSED; confirm at H0 | Claude session |
+| 2026-10-23 | Hacking has started; code is allowed (closes the §18 rules question) | Answered by the team at H0 | Team |
+| 2026-10-23 | **3D path: Amazon Location `terrain=Terrain3D` (§6 option 1), provisional.** Fallback 1 (open Terrain Tiles, Terrarium) works today | In us-west-2 the Satellite, Hybrid and Standard style descriptors accept `terrain=Terrain3D` and add a `raster-dem` source (`terrainSource`) plus a `terrain` block. No style ships 3D buildings, so we extrude the `buildings` tile layer ourselves. Tiles need the key, so the visual check waits for it. Fallback 1 is proven in Chromium: East San Jose foothills render in 3D (sampled ~590 m vs ~25 m downtown) | Claude session |
+| 2026-10-23 | Model IDs in use: **none yet**. `BEDROCK_FAST_MODEL_ID` / `BEDROCK_STRONG_MODEL_ID` stay empty until access is granted; set them in `.env` and as SAM parameters | Bedrock access not granted at H0 | Team |
+| 2026-10-23 | `converse()` returns a `ConverseResult` (text, model_id, latency_ms, tokens, stop_reason, raw) instead of the raw response | Callers get the numbers the trace row needs; tool-use callers still have `raw` | Claude session |
+| 2026-10-23 | `backend/requirements-dev.txt` (pytest, httpx, uvicorn); local server is `uvicorn app.main:app` (closes the dev-deps question) | Keeps test tools out of the Lambda zip; `sam local` needs Docker | Claude session |
+| 2026-10-23 | Bedrock IAM: `InvokeModel` on the configured profile and model ARNs, plus foundation models only when called through those profiles (`bedrock:InferenceProfileArn`) | Least privilege without hard-coding IDs | Claude session |
+| 2026-10-23 | The SAM stack creates the browser map key (`<stack>-maps`, Maps only, no expiry) | No key at H0; one deploy gives us one. The key is public in the bundle; referer restriction is a TODO | Claude session |
+| 2026-10-23 | 1-minute EventBridge schedule commented out until `main.handler` routes scheduled events (H4–H6) | It would fail every minute until then | Claude session |
+| 2026-10-23 | `amplify.yml` at the repo root (monorepo, `appRoot: frontend`, Node 22) | Amplify needs it to build a subfolder app; Vite 8 needs Node 20.19+ | Claude session |
+| 2026-10-23 | `IncidentMap` uses the Hybrid style (satellite + street labels) | Plan allows satellite or hybrid; labels help the coordinator | Claude session |
+| 2026-10-23 | `components/map/maplibre.ts` sets the MapLibre worker URL; `amazonStyle.ts` builds the style URLs | MapLibre v6 finds its worker at runtime and Vite doesn't copy it (map failed with "Worker failed to load") | Claude session |
+| 2026-10-23 | `/hello-bedrock` and its response type stay out of the shared contracts | Debug route for the gate only; deleted when §8 routes land | Claude session |
 
 ---
 
@@ -177,10 +211,9 @@ Waiting on the team or organizers. When answered, remove it here and record the 
 
 From [PLAN.md §18](PLAN.md#18-pre-event-checklist-and-open-questions):
 
-- [ ] **Rules:** may code be written before hacking starts? If not, prepare only docs, data and design before H0.
-- [ ] **Event schedule:** confirm the exact start time so H0 to H18 maps to the clock.
-- [ ] **AWS account:** region, and Bedrock model access for one fast and one strong Claude model.
-- [ ] **Amazon Location:** confirm the satellite/hybrid map style, 3D terrain and `OptimizeWaypoints` are available in our region with an API key. If 3D terrain is not, get a Mapbox token ready as the fallback.
+- [ ] **Event schedule:** hacking has started; record the exact H0 clock time so H0 to H18 maps to the clock.
+- [ ] **AWS account:** credentials not here yet. Region assumed `us-west-2` (in `.env.example` and the README); confirm. Bedrock model access for one fast and one strong Claude model, and their inference profile IDs.
+- [ ] **Amazon Location:** style and 3D terrain are confirmed at the style level in us-west-2 (see Decisions). Still open: a visual check on `/3d-test` with the key, and `OptimizeWaypoints` (H6–H7). Mapbox token only if both Amazon options fail.
 - [ ] **Persona sources** for `docs/sources.md`: HHS emPOWER (Santa Clara County), PG&E PSPS history, FDA insulin storage guidance, one documented outage-related harm.
 - [ ] **Assets:** wireframes of the four-area command center, the phone simulator and the volunteer view; a draft of the architecture diagram.
 - [ ] **Accounts:** an Amplify app connected to this repo; a screen recorder ready (for example OBS).
@@ -190,8 +223,14 @@ From the repo setup (2026-10-23):
 
 - [ ] **PROPOSED shapes** in `schemas.py` / `types.ts`: `ScoreBreakdown` field names, `Escalation`, `ToolCall`, `DashboardCase.resident`, `Outage.status`, `Stop.action` values, `Volunteer.capacity` meaning, `Resource.offers`. P1, P2, P3 confirm at H0.
 - [ ] **Seed data in Lambda:** `/demo/reset` reseeds from `data/`, but the Lambda package is `backend/` only. Copy `data/` into the build, upload it to S3, or move `CodeUri` to the repo root? (P2)
-- [ ] **Dev-only Python deps:** `pytest` ships in the Lambda zip, and there is no local server (`uvicorn`). Split into `requirements-dev.txt` with `uvicorn`, or run locally with `sam local start-api`? (P2)
 - [ ] **Test reply photos:** where do the 2 eval photos live (suggest `data/photos/`) and are binary files OK in the repo? (P4, P3)
 - [ ] **Frontend API client:** add `frontend/src/api/client.ts` (fetch wrapper + TanStack Query hooks) next to `types.ts`? Not added because it wasn't in the agreed additions. (P1)
 - [ ] **Small shared UI pieces** from §9 with no file in §10: top bar, action bar, About panel, "Amazon Bedrock" badge. They start inside `CommandCenter.tsx`; split into `components/` when needed? (P1)
 - [ ] **Lockfile:** `frontend/package-lock.json` is committed so all four laptops and Amplify install the same versions. Keep it? (P1, P2)
+
+From H0–H1 (2026-10-23):
+
+- [ ] **Amplify branch for the gate:** Amplify deploys `main` (§6). Connect this branch too for the gate check, or merge first? (P2)
+- [ ] **Lock down public surfaces:** CORS (`*` in FastAPI and the HTTP API) and the map key's allowed referers should name the Amplify URL and localhost once the Amplify URL exists. (P2)
+- [ ] **3D buildings height:** the extrusion reads the `height` property of the `buildings` tile layer, with 6 m if it's missing. Check on `/3d-test` with the key. If all buildings look the same height, drop buildings and keep terrain. (P1)
+- [ ] **Worker file type on Amplify:** the MapLibre worker ships as `assets/maplibre-gl-worker-*.mjs`. If the deployed map is blank with a MIME-type error, add a `Content-Type: text/javascript` custom header for `*.mjs`. (P1, P2)

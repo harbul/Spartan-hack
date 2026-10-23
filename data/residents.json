@@ -1,11 +1,33 @@
 {
   "_meta": {
-    "about": "Synthetic registry of electricity-dependent residents (~40, incl. the 5 hero residents from PLAN.md §3). One example record so far. All data is fictional; phones use 555 numbers.",
+    "about": "Synthetic registry of electricity-dependent residents (~40, incl. the 5 hero residents from PLAN.md §3). The 5 hero residents so far (res-001 to res-005); the other ~35 come in H1-H4. All data is fictional; phones use 555-01xx numbers.",
     "plan": "§3 demo scenario, §7 residents table",
     "owner": "P4 (Story, data and video)",
     "shape": "backend/app/schemas.py Resident / frontend/src/api/types.ts Resident"
   },
   "residents": [
+    {
+      "resident_id": "res-001",
+      "name": "Trần Văn Minh",
+      "age": 78,
+      "phone": "+14085550101",
+      "address": "3318 Fictional Hillview Dr, San Jose, CA 95127",
+      "lat": 37.3812,
+      "lng": -121.7905,
+      "language": "vi",
+      "devices": [
+        "oxygen"
+      ],
+      "baseline_backup_hours": 3,
+      "lives_alone": true,
+      "emergency_contact": {
+        "name": "Trần Thị Lan",
+        "relation": "daughter",
+        "phone": "+14085550151",
+        "language": "vi"
+      },
+      "notes": "Demo data. Home oxygen; keeps a backup tank with a gauge."
+    },
     {
       "resident_id": "res-002",
       "name": "Rosa Delgado",
@@ -15,7 +37,9 @@
       "lat": 37.3721,
       "lng": -121.8083,
       "language": "es",
-      "devices": ["insulin"],
+      "devices": [
+        "insulin"
+      ],
       "baseline_backup_hours": 12,
       "lives_alone": false,
       "emergency_contact": {
@@ -25,6 +49,72 @@
         "language": "en"
       },
       "notes": "Demo data. Keeps insulin pens in the fridge."
+    },
+    {
+      "resident_id": "res-003",
+      "name": "Harold Kim",
+      "age": 82,
+      "phone": "+14085550103",
+      "address": "905 Fictional Canyon Rd, San Jose, CA 95127",
+      "lat": 37.3655,
+      "lng": -121.7952,
+      "language": "en",
+      "devices": [
+        "power_wheelchair"
+      ],
+      "baseline_backup_hours": 8,
+      "lives_alone": false,
+      "emergency_contact": {
+        "name": "Grace Kim",
+        "relation": "wife",
+        "phone": "+14085550153",
+        "language": "en"
+      },
+      "notes": "Demo data. Uses a power wheelchair to get around the house."
+    },
+    {
+      "resident_id": "res-004",
+      "name": "Denise Okafor",
+      "age": 55,
+      "phone": "+14085550104",
+      "address": "2240 Fictional Vista Ln, San Jose, CA 95127",
+      "lat": 37.3528,
+      "lng": -121.8031,
+      "language": "en",
+      "devices": [
+        "dialysis"
+      ],
+      "baseline_backup_hours": 24,
+      "lives_alone": false,
+      "emergency_contact": {
+        "name": "Chidi Okafor",
+        "relation": "husband",
+        "phone": "+14085550154",
+        "language": "en"
+      },
+      "notes": "Demo data. Home dialysis; has a backup generator."
+    },
+    {
+      "resident_id": "res-005",
+      "name": "Lupe Ramírez",
+      "age": 89,
+      "phone": "+14085550105",
+      "address": "4071 Fictional Summit Ct, San Jose, CA 95127",
+      "lat": 37.3905,
+      "lng": -121.7998,
+      "language": "es",
+      "devices": [
+        "oxygen"
+      ],
+      "baseline_backup_hours": 4,
+      "lives_alone": true,
+      "emergency_contact": {
+        "name": "Carmen Ramírez",
+        "relation": "daughter",
+        "phone": "+14085550155",
+        "language": "es"
+      },
+      "notes": "Demo data. Home oxygen concentrator; lives alone."
     }
   ]
 }
