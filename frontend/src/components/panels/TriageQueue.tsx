@@ -9,6 +9,7 @@
 import { useState } from 'react';
 import type { DashboardCase } from '../../api/types';
 import BedrockBadge from '../BedrockBadge';
+import Icon from '../Icon';
 import { BAND_CLASS, CATEGORY, DEVICE_LABEL, LANGUAGE_LABEL, STATUS_LABEL, categoryOf } from '../status';
 
 type Sort = 'priority' | 'name' | 'silence';
@@ -35,18 +36,23 @@ export default function TriageQueue({ cases, selectedId, onSelect }: Props) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex gap-2 border-b border-stone-300 p-2">
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search name or street"
-          className="min-w-0 flex-1 rounded border border-stone-300 bg-white px-2 py-1 text-sm"
-        />
+      <div className="flex gap-2 border-b border-stone-200 p-3">
+        <label className="relative min-w-0 flex-1">
+          <span className="sr-only">Search residents</span>
+          <Icon name="search" className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" />
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search name or street"
+            className="h-10 w-full rounded-lg border border-stone-300 bg-white pl-8 pr-2 text-sm"
+          />
+        </label>
         <select
           value={sort}
           onChange={(e) => setSort(e.target.value as Sort)}
-          className="rounded border border-stone-300 bg-white px-1 text-sm"
-          aria-label="Sort"
+          className="h-10 rounded-lg border border-stone-300 bg-white px-2 text-sm"
+          aria-label="Sort by"
         >
           <option value="priority">Priority</option>
           <option value="silence">Silence</option>
@@ -60,21 +66,22 @@ export default function TriageQueue({ cases, selectedId, onSelect }: Props) {
             <li key={c.resident_id}>
               <button
                 onClick={() => onSelect(c.resident_id)}
-                className={`w-full border-b border-stone-200 px-3 py-2 text-left hover:bg-white ${
-                  c.resident_id === selectedId ? 'bg-white' : ''
+                aria-current={c.resident_id === selectedId ? 'true' : undefined}
+                className={`w-full border-b border-l-4 border-b-stone-200 px-3 py-2.5 text-left transition-colors duration-150 hover:bg-white ${
+                  c.resident_id === selectedId ? 'border-l-indigo-600 bg-white' : 'border-l-transparent'
                 }`}
               >
                 <div className="flex items-center gap-2">
                   <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: category.color }} />
                   <span className="truncate font-medium">{c.resident.name}</span>
-                  <span className="rounded bg-stone-200 px-1 text-[10px] font-semibold">
+                  <span className="rounded bg-stone-200 px-1 text-xs font-semibold">
                     {LANGUAGE_LABEL[c.resident.language]}
                   </span>
                   <span className={`ml-auto rounded px-1.5 text-xs font-semibold ${BAND_CLASS[c.band]}`}>
                     {c.band} {Math.round(c.priority)}
                   </span>
                 </div>
-                <div className="mt-1 flex flex-wrap items-center gap-1 text-[11px] text-stone-600">
+                <div className="mt-1 flex flex-wrap items-center gap-1 text-xs text-stone-600">
                   {c.resident.devices.map((d) => (
                     <span key={d} className="rounded border border-stone-300 px-1">
                       {DEVICE_LABEL[d]}

@@ -71,7 +71,7 @@ export default function AboutPanel({ onClose }: { onClose: () => void }) {
         aria-modal="true"
         aria-labelledby="about-title"
         onClick={(e) => e.stopPropagation()}
-        className="max-h-full w-full max-w-2xl overflow-y-auto rounded-lg bg-[#faf7f0] p-6 text-sm text-stone-800 shadow-xl"
+        className="max-h-full w-full max-w-2xl overflow-y-auto rounded-lg bg-panel p-6 text-sm text-stone-800 shadow-xl"
       >
         <header className="mb-3 flex items-start justify-between gap-4">
           <div>

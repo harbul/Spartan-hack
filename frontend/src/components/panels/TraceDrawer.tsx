@@ -1,5 +1,5 @@
 /**
- * Right panel, AI Trace tab: live list of Bedrock calls; each shows the masked prompt,
+ * AI activity tab: live list of Bedrock calls; each shows the masked prompt,
  * tool calls step by step, JSON output, latency, tokens and guardrail action.
  *
  * Data: GET /traces?limit=50.
@@ -31,10 +31,14 @@ export default function TraceDrawer({ traces }: { traces: Trace[] }) {
   }
   // TODO(P1, H8-H12): step-by-step tool calls for the Job 5 agent.
   return (
-    <ul className="divide-y divide-stone-200 text-sm">
+    <ul className="divide-y divide-stone-200 border-y border-stone-200 text-sm">
       {traces.map((t) => (
         <li key={t.trace_id}>
-          <button onClick={() => setOpen(open === t.trace_id ? null : t.trace_id)} className="w-full px-3 py-2 text-left hover:bg-white">
+          <button
+            onClick={() => setOpen(open === t.trace_id ? null : t.trace_id)}
+            aria-expanded={open === t.trace_id}
+            className="w-full px-4 py-2.5 text-left transition-colors duration-150 hover:bg-white"
+          >
             <div className="flex items-center gap-2">
               <BedrockBadge />
               <span className="font-medium">{JOB_LABEL[t.job]}</span>
@@ -51,7 +55,7 @@ export default function TraceDrawer({ traces }: { traces: Trace[] }) {
             </div>
           </button>
           {open === t.trace_id && (
-            <div className="space-y-2 bg-white px-3 pb-3 text-xs">
+            <div className="space-y-2 bg-white px-4 pb-3 text-xs">
               <h4 className="font-semibold">Prompt (PII masked)</h4>
               <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded bg-stone-100 p-2">{t.input_masked}</pre>
               <h4 className="font-semibold">Output</h4>
