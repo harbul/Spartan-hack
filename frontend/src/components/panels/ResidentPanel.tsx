@@ -1,5 +1,5 @@
 /**
- * Right panel, Resident tab: profile, medical dependency, last contact, backup left,
+ * Resident details (beside the map, and on the Residents tab): profile, medical dependency, last contact, backup left,
  * AI assessment (labeled AI-estimated urgency), message thread with translations, suggested action.
  *
  * Data: /dashboard cases, GET /residents/{id}/messages.
@@ -7,6 +7,7 @@
  */
 import type { DashboardCase, Message } from '../../api/types';
 import BedrockBadge from '../BedrockBadge';
+import Icon from '../Icon';
 import { BAND_CLASS, CATEGORY, DEVICE_LABEL, STATUS_LABEL, categoryOf, clockTime, givenName } from '../status';
 
 const NEED_LABEL: Record<string, string> = {
@@ -67,7 +68,7 @@ export default function ResidentPanel({ dcase, messages }: Props) {
       </dl>
 
       {(assessment || dcase.rationale) && (
-        <section className="rounded border border-stone-300 bg-white p-3">
+        <section className="rounded-lg border border-stone-200 bg-white p-3">
           <div className="mb-1 flex items-center gap-2">
             <h3 className="font-semibold">AI-estimated urgency</h3>
             <BedrockBadge />
@@ -100,12 +101,16 @@ export default function ResidentPanel({ dcase, messages }: Props) {
         <ul className="space-y-2">
           {messages.map((m) => (
             <li key={m.ts + m.direction} className={m.direction === 'out' ? 'pr-8' : 'pl-8'}>
-              <div className={`rounded-lg px-3 py-2 ${m.direction === 'out' ? 'bg-indigo-50' : 'bg-white'}`}>
+              <div className={`rounded-lg px-3 py-2 ${m.direction === 'out' ? 'bg-indigo-50' : 'bg-white ring-1 ring-stone-200'}`}>
                 <p>{m.text}</p>
                 {m.translation_en && <p className="mt-1 text-xs italic text-stone-500">{m.translation_en}</p>}
-                {m.image_key && <p className="mt-1 text-xs text-stone-500">📷 photo attached</p>}
+                {m.image_key && (
+                  <p className="mt-1 flex items-center gap-1 text-xs text-stone-500">
+                    <Icon name="camera" className="h-3.5 w-3.5" /> photo attached
+                  </p>
+                )}
               </div>
-              <div className="mt-0.5 flex items-center gap-1 text-[11px] text-stone-500">
+              <div className="mt-0.5 flex items-center gap-1 text-xs text-stone-500">
                 {m.direction === 'out' ? 'County' : givenName(resident)} · {clockTime(m.ts)}
                 {m.direction === 'out' && <BedrockBadge />}
               </div>

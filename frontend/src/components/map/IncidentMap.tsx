@@ -133,6 +133,7 @@ export default function IncidentMap({ dashboard, selectedId, onSelect }: Props) 
   // Fly to the selected home, once per selection (not on every 3 s poll).
   const flownTo = useRef<string | null>(null);
   useEffect(() => {
+    if (!selectedId) flownTo.current = null; // closing the details and picking the same home flies again
     if (!map || !selectedId || flownTo.current === selectedId) return;
     const resident = dashboard.cases.find((c) => c.resident_id === selectedId)?.resident;
     if (!resident) return;

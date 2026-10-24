@@ -1,6 +1,50 @@
 /*
  * Global styles: Tailwind and the design tokens.
- * TODO(P1, §9): cream panels, dark gray text, thin dividers, one accent, red only for Critical.
+ * Calm and light around the map (§9): cream panels, dark gray text, thin dividers,
+ * one accent (indigo, also the Amazon Bedrock badge), red only for Critical.
+ * Fonts, focus rings and reduced motion follow the ui-ux-pro-max checklist.
  * Owner: P1 (Frontend and UX). Plan: PLAN.md §9 Design.
  */
 @import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Fira Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'Fira Code', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --color-canvas: #f7f4ee; /* page background */
+  --color-panel: #faf7f0; /* sidebar, header, bottom console, dialogs */
+  --color-no-reply: #8b7fa8; /* gray-violet No reply, same as status.ts */
+}
+
+@layer base {
+  body {
+    @apply bg-canvas text-stone-800 antialiased;
+  }
+
+  /* Tailwind 4 dropped the pointer cursor on buttons. */
+  button:not(:disabled),
+  [role='button'],
+  select,
+  label:has(> input[type='file']) {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-indigo-600);
+    outline-offset: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

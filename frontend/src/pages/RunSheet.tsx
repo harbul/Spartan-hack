@@ -105,7 +105,7 @@ export default function RunSheet() {
   const remaining = view.stops_detail.filter((s) => s.status !== 'resolved').length;
 
   return (
-    <main className="mx-auto min-h-screen max-w-md bg-[#f7f4ee] text-stone-800">
+    <main className="mx-auto min-h-screen max-w-md bg-canvas text-stone-800">
       <header className="px-4 pb-2 pt-4">
         <p className="text-xs uppercase tracking-wide text-stone-500">StillHere · volunteer route · Demo data</p>
         <h1 className="text-xl font-semibold">{view.volunteer?.name ?? view.run.volunteer}</h1>

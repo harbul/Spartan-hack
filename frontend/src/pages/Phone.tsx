@@ -15,6 +15,7 @@ import { useState } from 'react';
 import { USE_MOCK, sendInbound, useMessages } from '../api/client';
 import { crowdReplies, residents, testReplies } from '../api/seed';
 import type { Message } from '../api/types';
+import Icon from '../components/Icon';
 import { LANGUAGE_LABEL, clockTime } from '../components/status';
 
 const MAX_PHOTO_BYTES = 1_000_000; // Lambda payload limit (§16)
@@ -127,7 +128,7 @@ export default function Phone() {
   };
 
   return (
-    <main className="flex min-h-screen items-start justify-center gap-8 bg-[#f7f4ee] p-6 text-stone-800">
+    <main className="flex min-h-screen items-start justify-center gap-8 bg-canvas p-6 text-stone-800">
       <div className="flex h-[740px] w-[360px] flex-col overflow-hidden rounded-[2.5rem] border-[10px] border-stone-800 bg-white shadow-xl">
         <header className="border-b border-stone-200 bg-stone-50 px-4 pb-2 pt-4 text-center">
           <select
@@ -175,8 +176,9 @@ export default function Phone() {
           )}
           {error && <p className="mb-1 text-xs text-red-600">{error}</p>}
           <div className="flex items-center gap-2">
-            <label className="cursor-pointer rounded-full bg-stone-100 px-2 py-1 text-lg" title="Attach a photo">
-              📷
+            <label className="flex h-9 w-9 items-center justify-center rounded-full bg-stone-100 text-stone-600 hover:bg-stone-200" title="Attach a photo">
+              <Icon name="camera" />
+              <span className="sr-only">Attach a photo</span>
               <input type="file" accept="image/*" className="hidden" onChange={(e) => attach(e.target.files?.[0])} />
             </label>
             <input
